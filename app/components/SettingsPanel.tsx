@@ -258,6 +258,26 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </option>
             ))}
           </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Arba įveskite balso ID rankiniu būdu žemiau
+          </p>
+        </div>
+
+        {/* Custom Voice ID Input */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Arba įveskite balso ID rankiniu būdu
+          </label>
+          <input
+            type="text"
+            value={selectedVoiceId}
+            onChange={(e) => setSelectedVoiceId(e.target.value)}
+            placeholder="pvz: rUjkmAIbnXhCdNuEPZGZ"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white placeholder:text-gray-400"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Naudokite šį lauką, jei jūsų balsas nematomas dropdown'e
+          </p>
         </div>
 
         {/* System Prompt */}
