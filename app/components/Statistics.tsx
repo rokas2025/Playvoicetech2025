@@ -15,9 +15,10 @@ export type TimingLog = {
 
 type StatisticsProps = {
   logs: TimingLog[];
+  onClear?: () => void;
 };
 
-export function Statistics({ logs }: StatisticsProps) {
+export function Statistics({ logs, onClear }: StatisticsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Calculate averages
@@ -45,13 +46,25 @@ export function Statistics({ logs }: StatisticsProps) {
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Statistika</h2>
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
-        >
-          {isExpanded ? 'Suskleisti ▲' : 'Išskleisti ▼'}
-        </button>
+        <h2 className="text-xl font-bold text-gray-900">
+          Statistika {logs.length > 0 && `(${logs.length} įrašų)`}
+        </h2>
+        <div className="flex gap-2">
+          {logs.length > 0 && onClear && (
+            <button
+              onClick={onClear}
+              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+            >
+              🗑️ Išvalyti
+            </button>
+          )}
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+          >
+            {isExpanded ? 'Suskleisti ▲' : 'Išskleisti ▼'}
+          </button>
+        </div>
       </div>
 
       {/* Summary Stats */}

@@ -3,14 +3,44 @@
 import { VoiceChat } from './components/VoiceChat';
 import { SettingsPanel } from './components/SettingsPanel';
 import { Statistics, type TimingLog } from './components/Statistics';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [timingLogs, setTimingLogs] = useState<TimingLog[]>([]);
 
+  // Load logs from localStorage on mount
+  useEffect(() => {
+    const savedLogs = localStorage.getItem('timing_logs');
+    if (savedLogs) {
+      try {
+        const parsed = JSON.parse(savedLogs);
+        // Convert timestamp strings back to Date objects
+        const logsWithDates = parsed.map((log: any) => ({
+          ...log,
+          timestamp: new Date(log.timestamp),
+        }));
+        setTimingLogs(logsWithDates);
+      } catch (err) {
+        console.error('Error loading logs:', err);
+      }
+    }
+  }, []);
+
   const handleTimingLog = (log: TimingLog) => {
-    setTimingLogs(prev => [...prev, log]);
+    setTimingLogs(prev => {
+      const newLogs = [...prev, log];
+      // Save to localStorage
+      localStorage.setItem('timing_logs', JSON.stringify(newLogs));
+      return newLogs;
+    });
+  };
+
+  const handleClearLogs = () => {
+    if (confirm('Ar tikrai norite išvalyti visą statistiką?')) {
+      setTimingLogs([]);
+      localStorage.removeItem('timing_logs');
+    }
   };
 
   return (
@@ -48,7 +78,7 @@ export default function Home() {
 
         {/* Statistics Section */}
         <div className="mt-6">
-          <Statistics logs={timingLogs} />
+          <Statistics logs={timingLogs} onClear={handleClearLogs} />
         </div>
       </main>
 
