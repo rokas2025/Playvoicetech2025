@@ -431,7 +431,20 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         if (!isPlaying) break;
 
         // Convert chunk to AudioBuffer
-        const int16Array = new Int16Array(value.buffer);
+        // Handle odd-length chunks by ensuring even byte count
+        let buffer = value.buffer;
+        let byteLength = buffer.byteLength;
+        
+        // If odd byte count, create aligned buffer
+        if (byteLength % 2 !== 0) {
+          console.warn(`[TTS V2] Odd chunk size (${byteLength} bytes), aligning...`);
+          const alignedBuffer = new ArrayBuffer(byteLength - 1);
+          new Uint8Array(alignedBuffer).set(new Uint8Array(buffer, 0, byteLength - 1));
+          buffer = alignedBuffer;
+          byteLength = buffer.byteLength;
+        }
+        
+        const int16Array = new Int16Array(buffer);
         const audioBuffer = audioContext.createBuffer(1, int16Array.length, 16000);
         const channelData = audioBuffer.getChannelData(0);
         
