@@ -13,12 +13,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { text, voice_id, voice_settings } = body;
-    const streamingEnabled = voice_settings?.tts_streaming_enabled ?? false;
+    const streamingMode = voice_settings?.tts_streaming_mode || 'normal';
 
     console.log('[TTS] Request:', {
       voice_id,
       text_length: text.length,
-      streaming_enabled: streamingEnabled,
+      streaming_mode: streamingMode,
       timestamp: new Date().toISOString(),
     });
 
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         error: errorText,
         voice_id,
         model_id: 'eleven_v3',
-        streaming_enabled: streamingEnabled,
+        streaming_mode: streamingMode,
       });
       return NextResponse.json(
         { 
@@ -88,9 +88,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ✨ CONDITIONAL: Streaming V1 arba Normal buffering
-    if (streamingEnabled) {
-      console.log('[TTS] Using STREAMING V1 mode - direct passthrough');
+    // ✨ CONDITIONAL: 3 streaming modes
+    if (streamingMode === 'streaming-v2' || streamingMode === 'streaming-v1') {
+      console.log(`[TTS] Using ${streamingMode.toUpperCase()} mode - direct passthrough`);
       
       if (!response.body) {
         console.error('[TTS] No response body from ElevenLabs');
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         status: 200,
         headers: {
           'Content-Type': 'audio/pcm',
-          'X-TTS-Mode': 'streaming-v1', // Custom header for tracking
+          'X-TTS-Mode': streamingMode, // Return actual mode
         },
       });
     } else {
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         headers: {
           'Content-Type': 'audio/pcm',
           'Content-Length': audioBuffer.byteLength.toString(),
-          'X-TTS-Mode': 'normal', // Custom header for tracking
+          'X-TTS-Mode': 'normal',
         },
       });
     }

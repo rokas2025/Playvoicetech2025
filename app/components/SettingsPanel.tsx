@@ -15,7 +15,7 @@ type VoiceSettings = {
   speed: number;
   use_speaker_boost: boolean;
   optimize_streaming_latency?: number | null;
-  tts_streaming_enabled?: boolean;
+  tts_streaming_mode?: 'normal' | 'streaming-v1' | 'streaming-v2';
 };
 
 type SettingsPanelProps = {
@@ -34,7 +34,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     speed: 1.1, // Slightly faster speech (1.1 = 10% faster)
     use_speaker_boost: false, // Disable for lower latency (adds processing time)
     optimize_streaming_latency: 4, // Maximum optimization (4 = most aggressive)
-    tts_streaming_enabled: false, // Streaming V1 disabled by default (experimental)
+    tts_streaming_mode: 'normal', // Default to normal mode (most stable)
   });
   
   // Agent knowledge fields
@@ -97,7 +97,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 speed: settingsData.preset.speed,
                 use_speaker_boost: settingsData.preset.use_speaker_boost,
                 optimize_streaming_latency: settingsData.preset.optimize_streaming_latency ?? 3,
-                tts_streaming_enabled: settingsData.preset.tts_streaming_enabled ?? false,
+                tts_streaming_mode: settingsData.preset.tts_streaming_mode || 'normal',
               });
             }
           }
@@ -481,7 +481,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   speed: 1.1,
                   use_speaker_boost: false,
                   optimize_streaming_latency: 4,
-                  tts_streaming_enabled: false,
+                  tts_streaming_mode: 'normal',
                 });
               }}
               className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
@@ -623,48 +623,115 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             </p>
           </div>
 
-          {/* TTS Streaming V1 (Experimental) */}
+          {/* TTS Streaming Mode Selection */}
           <div className="border-t pt-4 mt-4">
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <span className="text-2xl">⚡</span>
+                  <span className="text-2xl">🎯</span>
                 </div>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">
-                    Eksperimentinė funkcija
+                  <h3 className="text-sm font-medium text-blue-800">
+                    TTS Streaming Režimai (A/B/C Testing)
                   </h3>
-                  <div className="mt-2 text-sm text-yellow-700">
+                  <div className="mt-2 text-sm text-blue-700">
                     <p>
-                      TTS Streaming V1 sumažina latency ~40-50%, bet yra beta versija.
-                      Galite lyginti rezultatus su "Normal" režimu statistikoje.
+                      Pasirinkite TTS streaming režimą ir palyginkite rezultatus statistikoje.
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="tts-streaming"
-                checked={voiceSettings.tts_streaming_enabled ?? false}
-                onChange={(e) =>
-                  setVoiceSettings({ 
-                    ...voiceSettings, 
-                    tts_streaming_enabled: e.target.checked 
-                  })
-                }
-                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-              />
-              <label htmlFor="tts-streaming" className="ml-2 text-sm font-medium text-gray-900">
-                🚀 Įjungti TTS Streaming V1 (eksperimentinis)
+            <div className="space-y-3">
+              {/* Normal Mode */}
+              <label className="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <input
+                  type="radio"
+                  name="tts-mode"
+                  value="normal"
+                  checked={voiceSettings.tts_streaming_mode === 'normal' || !voiceSettings.tts_streaming_mode}
+                  onChange={(e) =>
+                    setVoiceSettings({ 
+                      ...voiceSettings, 
+                      tts_streaming_mode: 'normal'
+                    })
+                  }
+                  className="mt-1 w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                />
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📦</span>
+                    <span className="font-semibold text-gray-900">Normal (Tradicinis)</span>
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">Default</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Tradicinis buffering režimas. Stabiliausias, bet lėčiausias (~2.0s latency).
+                  </p>
+                </div>
+              </label>
+
+              {/* Streaming V1 */}
+              <label className="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <input
+                  type="radio"
+                  name="tts-mode"
+                  value="streaming-v1"
+                  checked={voiceSettings.tts_streaming_mode === 'streaming-v1'}
+                  onChange={(e) =>
+                    setVoiceSettings({ 
+                      ...voiceSettings, 
+                      tts_streaming_mode: 'streaming-v1'
+                    })
+                  }
+                  className="mt-1 w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                />
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⚡</span>
+                    <span className="font-semibold text-gray-900">Streaming V1</span>
+                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs">Beta</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Backend streaming, frontend buffering. Vidutinis greitis (~1.8s latency).
+                  </p>
+                </div>
+              </label>
+
+              {/* Streaming V2 */}
+              <label className="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <input
+                  type="radio"
+                  name="tts-mode"
+                  value="streaming-v2"
+                  checked={voiceSettings.tts_streaming_mode === 'streaming-v2'}
+                  onChange={(e) =>
+                    setVoiceSettings({ 
+                      ...voiceSettings, 
+                      tts_streaming_mode: 'streaming-v2'
+                    })
+                  }
+                  className="mt-1 w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                />
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🚀</span>
+                    <span className="font-semibold text-gray-900">Streaming V2 (Full Streaming)</span>
+                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Greičiausias</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Pilnas streaming (backend + frontend). Greičiausias (~0.9s latency). Eksperimentinis!
+                  </p>
+                </div>
               </label>
             </div>
-            <p className="text-xs text-gray-500 mt-2 ml-6">
-              Streaming režimas siunčia audio chunks iš karto, sumažindamas TTFB ~40-50%.
-              Išjunkite jei pastebite problemas.
-            </p>
+
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-xs text-yellow-800">
+                💡 <strong>Patarimas:</strong> Išbandykite visus 3 režimus ir palyginkite rezultatus 
+                Statistika lentelėje. V2 turėtų būti ~50% greičiau nei Normal.
+              </p>
+            </div>
           </div>
         </div>
 

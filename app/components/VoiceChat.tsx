@@ -299,7 +299,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     }
   };
 
-  const playTTS = async (text: string): Promise<{ voiceId: string | null; ttsMode: 'normal' | 'streaming-v1' } | null> => {
+  const playTTS = async (text: string): Promise<{ voiceId: string | null; ttsMode: 'normal' | 'streaming-v1' | 'streaming-v2' } | null> => {
     try {
       // Get agent first
       const agentsRes = await fetch('/api/agents');
@@ -329,7 +329,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
               speed: settingsData.preset.speed,
               use_speaker_boost: settingsData.preset.use_speaker_boost,
               optimize_streaming_latency: settingsData.preset.optimize_streaming_latency,
-              tts_streaming_enabled: settingsData.preset.tts_streaming_enabled,
+              tts_streaming_mode: settingsData.preset.tts_streaming_mode || 'normal',
             };
             voiceId = settingsData.preset.eleven_voice_id;
           }
@@ -355,36 +355,122 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       }
 
       // Capture TTS mode from response header
-      const ttsMode = response.headers.get('X-TTS-Mode') as 'normal' | 'streaming-v1' || 'normal';
+      const ttsMode = response.headers.get('X-TTS-Mode') as 'normal' | 'streaming-v1' | 'streaming-v2' || 'normal';
       console.log('[TTS] Mode used:', ttsMode);
 
-      // Handle PCM audio playback using Web Audio API
-      const audioBuffer = await response.arrayBuffer();
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-      
-      // Convert PCM to AudioBuffer
-      const audioBufferData = audioContext.createBuffer(1, audioBuffer.byteLength / 2, 16000);
-      const channelData = audioBufferData.getChannelData(0);
-      const view = new Int16Array(audioBuffer);
-      
-      for (let i = 0; i < view.length; i++) {
-        channelData[i] = view[i] / 32768.0; // Convert to float32
+      // ✨ CONDITIONAL PLAYBACK based on mode
+      if (ttsMode === 'streaming-v2') {
+        // 🚀 STREAMING V2: Chunk-by-chunk playback
+        return await playStreamingV2(response, voiceId, ttsMode);
+      } else {
+        // 📦 NORMAL or ⚡ V1: Traditional buffering
+        return await playBuffered(response, voiceId, ttsMode);
       }
-
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBufferData;
-      source.connect(audioContext.destination);
-
-      return new Promise<{ voiceId: string | null; ttsMode: 'normal' | 'streaming-v1' }>((resolve, reject) => {
-        source.onended = () => {
-          audioContext.close();
-          resolve({ voiceId, ttsMode });
-        };
-        source.start(0);
-      });
     } catch (err) {
       console.error('Error playing TTS:', err);
       return null;
+    }
+  };
+
+  // 📦 Traditional buffered playback (Normal + V1)
+  const playBuffered = async (
+    response: Response, 
+    voiceId: string | null, 
+    ttsMode: 'normal' | 'streaming-v1' | 'streaming-v2'
+  ): Promise<{ voiceId: string | null; ttsMode: 'normal' | 'streaming-v1' | 'streaming-v2' }> => {
+    const audioBuffer = await response.arrayBuffer();
+    const audioContext = new AudioContext({ sampleRate: 16000 });
+    
+    // Convert PCM to AudioBuffer
+    const audioBufferData = audioContext.createBuffer(1, audioBuffer.byteLength / 2, 16000);
+    const channelData = audioBufferData.getChannelData(0);
+    const view = new Int16Array(audioBuffer);
+    
+    for (let i = 0; i < view.length; i++) {
+      channelData[i] = view[i] / 32768.0;
+    }
+
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBufferData;
+    source.connect(audioContext.destination);
+
+    return new Promise((resolve) => {
+      source.onended = () => {
+        audioContext.close();
+        resolve({ voiceId, ttsMode });
+      };
+      source.start(0);
+    });
+  };
+
+  // 🚀 STREAMING V2: Chunk-by-chunk playback
+  const playStreamingV2 = async (
+    response: Response,
+    voiceId: string | null,
+    ttsMode: 'normal' | 'streaming-v1' | 'streaming-v2'
+  ): Promise<{ voiceId: string | null; ttsMode: 'normal' | 'streaming-v1' | 'streaming-v2' }> => {
+    const audioContext = new AudioContext({ sampleRate: 16000 });
+    const reader = response.body!.getReader();
+    
+    let audioQueue: AudioBufferSourceNode[] = [];
+    let nextStartTime = audioContext.currentTime;
+    let isPlaying = true;
+
+    try {
+      console.log('[TTS V2] Starting chunk-by-chunk streaming...');
+      
+      // Read and play chunks as they arrive
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('[TTS V2] Stream complete');
+          break;
+        }
+
+        if (!isPlaying) break;
+
+        // Convert chunk to AudioBuffer
+        const int16Array = new Int16Array(value.buffer);
+        const audioBuffer = audioContext.createBuffer(1, int16Array.length, 16000);
+        const channelData = audioBuffer.getChannelData(0);
+        
+        for (let i = 0; i < int16Array.length; i++) {
+          channelData[i] = int16Array[i] / 32768.0;
+        }
+
+        // Schedule chunk for playback
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        
+        // Schedule to play after previous chunk
+        source.start(nextStartTime);
+        nextStartTime += audioBuffer.duration;
+        
+        audioQueue.push(source);
+        
+        console.log(`[TTS V2] Playing chunk (${int16Array.length} samples, ${audioBuffer.duration.toFixed(2)}s)`);
+      }
+
+      // Wait for all chunks to finish
+      return new Promise((resolve) => {
+        if (audioQueue.length === 0) {
+          audioContext.close();
+          resolve({ voiceId, ttsMode });
+          return;
+        }
+
+        const lastSource = audioQueue[audioQueue.length - 1];
+        lastSource.onended = () => {
+          audioContext.close();
+          resolve({ voiceId, ttsMode });
+        };
+      });
+    } catch (error) {
+      console.error('[TTS V2] Streaming error:', error);
+      audioContext.close();
+      throw error;
     }
   };
 
