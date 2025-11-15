@@ -1,0 +1,320 @@
+---
+alwaysApply: true
+---
+You are a senior full-stack TypeScript engineer working in Cursor on a real-time Lithuanian voice assistant demo.
+
+GOAL
+----
+Build a small web dashboard (Next.js + React) deployed on Vercel that:
+1. Lets a user speak into their microphone in Lithuanian.
+2. Streams the audio to ElevenLabs Speech-to-Text (STT) using their realtime endpoint for low-latency transcription.
+3. Sends the transcribed Lithuanian text to an LLM (OpenAI by default) to generate the reply in Lithuanian.
+4. Streams the reply back to the user using ElevenLabs Text-to-Speech (TTS) with the **eleven_v3** model, using one of the user’s own voices.
+5. Uses **Supabase** to store:
+   - agent/voice settings (selected voice, voice_settings sliders, system prompts),
+   - conversation sessions and message history (for later analytics or SIP integration).
+6. Provides a simple settings UI (in Lithuanian) to choose:
+   - which ElevenLabs voice to use (only voices from the user’s account),
+   - the ElevenLabs v3 voice settings (stability, similarity_boost, style, speed, use_speaker_boost),
+   - which LLM model/provider to use (start with OpenAI, but keep the code clean so it’s easy to swap to Anthropic/Groq/etc. later).
+
+IMPORTANT HIGH-LEVEL ARCHITECTURE
+---------------------------------
+- Runtime stack:
+  - Next.js 15 (App Router) + TypeScript
+  - React client components for audio handling
+  - Tailwind CSS for styling (simple, clean UI)
+  - Hosted on Vercel
+- Persistence:
+  - Supabase Postgres
+  - Use Supabase JS client on the server side (for API routes) and optionally on the client side where safe.
+- External services:
+  - ElevenLabs API (enterprise key) for:
+    - Realtime STT: wss://api.elevenlabs.io/v1/speech-to-text/realtime
+    - TTS streaming: POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream
+    - Voices list: GET https://api.elevenlabs.io/v2/voices
+  - OpenAI (or another LLM provider) for text responses.
+
+ENVIRONMENT & SECRETS
+---------------------
+Assume we will provide these environment variables (do NOT hard-code values):
+
+- ELEVENLABS_API_KEY
+- OPENAI_API_KEY       (or LLM_API_KEY_GENERIC if you abstract it)
+- SUPABASE_URL
+- SUPABASE_ANON_KEY
+
+Instructions:
+1. If any of these env vars are missing, ASK ME explicitly to provide them and where to place them.
+2. Use `.env.local` in Next.js for local dev and rely on Vercel environment variables for production.
+3. Never commit any secrets or write them into the code. Always read from process.env.
+
+USE OF SUPABASE + MCP
+----------------------
+We will use Supabase both as:
+- the app database (Supabase project already exists or will be created),
+- AND as an MCP server inside Cursor (server name: "supabase").
+
+You are allowed to:
+- Use the **Supabase MCP server** to:
+  - design database schema,
+  - generate SQL migrations / table DDL,
+  - reason about relationships.
+- Then, in the actual code, use the **Supabase JS client** (no MCP calls in application runtime).
+
+DATABASE SCHEMA (Supabase)
+--------------------------
+Use MCP ("supabase" server) to design and create these tables:
+
+1. agents
+   - id (uuid, primary key, default uuid_generate_v4())
+   - name (text)                        // e.g. "Pagrindinis agentas"
+   - description (text, nullable)
+   - system_prompt (text, nullable)     // Lithuanian system prompt for the LLM
+   - default_voice_id (text, nullable)  // ElevenLabs voice_id
+   - model_id (text, default 'eleven_v3')  // TTS model
+   - created_at (timestamptz, default now())
+
+2. voice_presets
+   - id (uuid, pk)
+   - agent_id (uuid, fk -> agents.id, on delete cascade)
+   - eleven_voice_id (text)             // exact voice_id from ElevenLabs
+   - display_name (text)
+   - stability (float8, default 0.5)
+   - similarity_boost (float8, default 0.8)
+   - style (float8, default 0.0)
+   - speed (float8, default 1.0)
+   - use_speaker_boost (boolean, default true)
+   - is_default (boolean, default false)
+   - created_at (timestamptz, default now())
+
+3. sessions
+   - id (uuid, pk)
+   - agent_id (uuid, fk -> agents.id)
+   - started_at (timestamptz, default now())
+   - ended_at (timestamptz, nullable)
+   - meta (jsonb, nullable)             // e.g. browser info, test flags
+
+4. messages
+   - id (uuid, pk)
+   - session_id (uuid, fk -> sessions.id, on delete cascade)
+   - role (text)                        // "user" or "assistant"
+   - text (text)                        // Lithuanian text
+   - raw_stt (jsonb, nullable)          // optional raw STT payload from ElevenLabs
+   - tts_voice_id (text, nullable)
+   - created_at (timestamptz, default now())
+
+NOTE:
+- Use MCP to create this schema safely in Supabase.
+- Respect Supabase best practices, but keep it simple (no RLS rules at first; we can add later).
+
+UI / UX REQUIREMENTS
+--------------------
+- All user-facing copy must be in Lithuanian (button labels, tooltips, etc.).
+- Build a single-page dashboard at `/` with:
+  1) **Main voice chat panel**
+     - Big "Mikrofonas" button (toggle: press to start, press to stop).
+     - Status indicator: "Klausausi...", "Mąstau...", "Kalbu...", "Paruošta".
+     - Simple transcript area:
+       - show latest user utterances and assistant responses as chat bubbles.
+  2) **Settings panel** (side or modal):
+     - Dropdown to select **Agentas** (from agents table).
+     - Dropdown to select **Balsas**:
+       - Data source: GET `/api/eleven/voices` (see ElevenLabs section below).
+       - Only show voices that belong to our account (as returned by ElevenLabs).
+       - Assume all listed voices work with model_id "eleven_v3".
+     - Sliders / controls for voice settings:
+       - stability (0.0–1.0, default 0.5)
+       - similarity_boost (0.0–1.0, default 0.8)
+       - style (0.0–1.0, default 0.0)
+       - speed (0.7–1.2, default 1.0)
+       - use_speaker_boost (checkbox, default true)
+     - Textarea for the **agent system prompt** (Lithuanian).
+
+- When user changes settings and clicks "Išsaugoti nustatymus":
+  - Persist to Supabase (agent + voice_presets).
+  - Use those settings for subsequent calls to ElevenLabs TTS and to the LLM.
+
+ELEVENLABS INTEGRATION – VOICES
+-------------------------------
+Implement a backend API route:
+
+- `GET /api/eleven/voices`
+
+Behavior:
+- Reads ELEVENLABS_API_KEY from env.
+- Calls ElevenLabs:
+  - `GET https://api.elevenlabs.io/v2/voices`
+  - Headers: `xi-api-key: <ELEVENLABS_API_KEY>`, `Accept: application/json`
+- Response (to frontend):
+  - JSON array with simplified items: `{ id, name, description?, category?, sample_url? }`
+- On the frontend:
+  - Populate the voice dropdown from this list.
+  - For now, assume all returned voices are compatible with `model_id: "eleven_v3"`.
+
+ELEVENLABS INTEGRATION – REALTIME STT
+-------------------------------------
+Goal: As low latency as reasonably possible, but we can start with a straightforward implementation.
+
+Use the ElevenLabs realtime STT WebSocket:
+
+- URL: `wss://api.elevenlabs.io/v1/speech-to-text/realtime`
+- Query parameters:
+  - `model_id=<best STT model for Lithuanian>` (e.g., Scribe v2 model ID from docs)
+  - `language_code="lt"` (ISO 639-1 for Lithuanian)
+  - `commit_strategy="vad"` or `"manual"` (start with `"vad"` for automated chunking)
+  - `include_timestamps=false` for v1
+- Auth:
+  - Either:
+    - `xi-api-key` header with ELEVENLABS_API_KEY (server-side) OR
+    - Use a single-use token from ElevenLabs if connecting from the browser directly.
+
+Implementation approach (start with simpler version):
+1. **Client side:**
+   - Use `MediaDevices.getUserMedia({ audio: true })`.
+   - Capture microphone audio, convert to PCM 16k mono.
+   - Stream audio frames to our backend (WebSocket endpoint or similar).
+2. **Server side (Next.js route handler):**
+   - Implement a WebSocket bridge (e.g. `/api/ws/voice`) that:
+     - On connect:
+       - Opens a WebSocket to ElevenLabs STT realtime endpoint.
+     - Forwards `input_audio_chunk` messages:
+       - `{ "message_type": "input_audio_chunk", "audio_base_64": "<base64_pcm>", "commit": false/true, "sample_rate": 16000 }`
+     - Receives:
+       - `partial_transcript`
+       - `committed_transcript`
+       - (optionally with timestamps)
+     - For each `committed_transcript`:
+       - Forward the committed text to the LLM pipeline.
+       - Also send the committed text back to the browser so the UI can update the chat.
+
+NOTE:
+- If full duplex bridging becomes too tricky in a single iteration, you may start with a simpler "push-to-talk" flow:
+  - Record a short audio clip, send to a REST endpoint that uses ElevenLabs STT convert API,
+  - Then call LLM and TTS.
+- But the target design should support streaming via the realtime WebSocket as described.
+
+ELEVENLABS INTEGRATION – TTS STREAMING (ELEVEN_V3)
+--------------------------------------------------
+Use the streaming Text-to-Speech endpoint:
+
+- URL:
+  - `POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream?output_format=pcm_16000`
+- Headers:
+  - `xi-api-key: <ELEVENLABS_API_KEY>`
+  - `Content-Type: application/json`
+- JSON body:
+  - `text`: Lithuanian reply from the LLM
+  - `model_id`: `"eleven_v3"`      // required, we want the v3 alpha model
+  - `voice_settings`:
+    - `stability`: number (0.0–1.0)
+    - `similarity_boost`: number (0.0–1.0)
+    - `style`: number (0.0–1.0)
+    - `speed`: number (0.7–1.2)
+    - `use_speaker_boost`: boolean
+
+For lowest latency, also include:
+  - (If supported) `optimize_streaming_latency: 3` or equivalent param to request aggressive chunking.
+
+Backend TTS route:
+
+- `POST /api/eleven/tts`
+  - Input: `{ text, voice_id, voice_settings }`
+  - Calls ElevenLabs streaming TTS and streams audio to the client.
+
+Frontend audio playback:
+
+- Use Web Audio API / AudioContext.
+- Play PCM 16k stream as it arrives (no need to wait for full file).
+- If streaming is complex, as a first version you can:
+  - buffer the whole response,
+  - create a Blob and use an `<audio>` element,
+  - then iterate to streaming.
+
+LLM INTEGRATION (TEXT RESPONSE)
+-------------------------------
+For now, use OpenAI Chat Completions (or OpenAI-compatible provider like Groq if configured).
+
+Backend route:
+
+- `POST /api/llm/chat`
+  - Input: `{ agent_id, messages: [{ role, content }], maybe context }`
+  - Behavior:
+    - Load agent settings from Supabase (system_prompt, etc.).
+    - Build messages array:
+      - system: system_prompt (Lithuanian, define defaults if missing).
+      - then conversation messages from `messages` table (optional, last N).
+      - append the latest user message.
+    - Call the LLM with streaming disabled at first (simple).
+    - Ensure that the LLM is instructed to always answer in **Lithuanian**.
+  - Return: `{ replyText }` (Lithuanian string).
+
+Later we can upgrade to streaming completions to overlap LLM + TTS.
+
+PERSISTENCE LOGIC
+-----------------
+- Whenever we get a **committed transcript** from STT:
+  - Create or reuse a `sessions` row (current session).
+  - Insert into `messages`:
+    - role = "user"
+    - text = committed transcript (Lithuanian)
+    - raw_stt = full event payload (optional)
+- Whenever we get an LLM reply:
+  - Insert into `messages`:
+    - role = "assistant"
+    - text = replyText
+    - tts_voice_id = current selected voice.
+
+- On the frontend, show at least the last 10 messages for the current session.
+
+CODE STYLE & ORGANIZATION
+-------------------------
+- Use TypeScript everywhere.
+- Use modern React (hooks, server components where appropriate).
+- Use clean separation:
+  - `/app/page.tsx` – main UI
+  - `/app/api/eleven/voices/route.ts` – voices
+  - `/app/api/eleven/tts/route.ts` – tts
+  - `/app/api/llm/chat/route.ts` – llm
+  - `/app/api/ws/voice/route.ts` – realtime STT bridge (if WebSocket-based)
+- Create reusable helpers:
+  - `lib/elevenlabs.ts` – helpers for HTTP calls to ElevenLabs.
+  - `lib/supabaseServer.ts` – server-side Supabase client.
+  - `lib/llm.ts` – LLM abstraction (so we can swap provider later).
+
+WHAT YOU MUST ASK ME
+--------------------
+After reading these instructions, you (the AI in Cursor) should:
+1. Confirm the tech stack and folder layout.
+2. Ask me for:
+   - ELEVENLABS_API_KEY,
+   - OPENAI_API_KEY,
+   - SUPABASE_URL,
+   - SUPABASE_ANON_KEY.
+3. Ask whether to start with:
+   - (A) simpler push-to-talk (REST STT + REST TTS), or
+   - (B) full realtime WebSocket bridging from the beginning.
+   If I don’t answer, assume (A) for v1, but keep the code structure ready for upgrade to (B).
+
+UI LANGUAGE
+-----------
+All texts visible to the end user must be in Lithuanian. Examples:
+- Button: "Pradėti kalbėti", "Sustabdyti"
+- Status: "Klausausi...", "Mąstau...", "Kalbu..."
+- Labels:
+  - "Pasirinkite balsą"
+  - "Stabilumas"
+  - "Panašumas"
+  - "Stilius"
+  - "Greitis"
+  - "Garsiakalbio pastiprinimas"
+  - "Agento sistemos pranešimas"
+
+MAIN PRIORITIES
+---------------
+1. Correct and secure use of ElevenLabs APIs (STT realtime + TTS streaming + voices list).
+2. Clean, extensible architecture (easy to plug into SIP later).
+3. Minimal latency, but correctness first.
+4. Clear, Lithuanian-first UX for testing.
+
+Follow these instructions strictly. If something in the stack is not supported by Next.js/Vercel limitations (e.g., server WebSocket specifics), explain the trade-offs and implement the closest reliable alternative.
