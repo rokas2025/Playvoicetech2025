@@ -52,9 +52,20 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('ElevenLabs TTS error:', errorText);
+      console.error('ElevenLabs TTS API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+        voice_id,
+        model_id: 'eleven_v3',
+      });
       return NextResponse.json(
-        { error: 'Failed to generate speech' },
+        { 
+          error: 'Failed to generate speech', 
+          details: errorText,
+          voice_id,
+          model: 'eleven_v3'
+        },
         { status: response.status }
       );
     }
