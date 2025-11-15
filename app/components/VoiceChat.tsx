@@ -403,7 +403,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     });
   };
 
-  // 🚀 STREAMING V2: Chunk-by-chunk playback with smooth transitions
+  // 🚀 STREAMING V2: Chunk-by-chunk playback with cross-fade
   const playStreamingV2 = async (
     response: Response,
     voiceId: string | null,
@@ -413,29 +413,24 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     const reader = response.body!.getReader();
     
     let audioQueue: AudioBufferSourceNode[] = [];
-    let nextStartTime = audioContext.currentTime + 0.05; // Initial buffer
+    let nextStartTime = audioContext.currentTime + 0.05;
     let isPlaying = true;
+    const FADE_DURATION = 0.004; // 4ms fade (64 samples @ 16kHz)
 
-    // Helper: Apply fade in/out to prevent clicks
-    const applyFades = (channelData: Float32Array, fadeLength: number = 64) => {
+    // Helper: Apply fade in ONLY (no fade out - we'll overlap instead)
+    const applyFadeIn = (channelData: Float32Array, fadeLength: number = 64) => {
       const len = channelData.length;
-      const actualFadeLength = Math.min(fadeLength, Math.floor(len / 4));
+      const actualFadeLength = Math.min(fadeLength, Math.floor(len / 2));
       
       // Fade in (first samples)
       for (let i = 0; i < actualFadeLength; i++) {
         const gain = i / actualFadeLength;
         channelData[i] *= gain;
       }
-      
-      // Fade out (last samples)
-      for (let i = 0; i < actualFadeLength; i++) {
-        const gain = i / actualFadeLength;
-        channelData[len - 1 - i] *= gain;
-      }
     };
 
     try {
-      console.log('[TTS V2] Starting chunk-by-chunk streaming with smooth transitions...');
+      console.log('[TTS V2] Starting chunk-by-chunk streaming with cross-fade...');
       
       // Read and play chunks as they arrive
       let chunkCount = 0;
@@ -478,12 +473,21 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           channelData[i] = int16Array[i] / 32768.0;
         }
         
-        // Apply smooth fades to prevent clicks
-        applyFades(channelData);
+        // Apply fade in to prevent clicks (no fade out - we overlap instead)
+        applyFadeIn(channelData);
 
         // Schedule chunk for playback
         const now = audioContext.currentTime;
-        const startTime = Math.max(now + 0.01, nextStartTime);
+        
+        // ✨ KEY FIX: Overlap by fade duration to create cross-fade
+        let startTime;
+        if (chunkCount === 0) {
+          // First chunk: normal start
+          startTime = Math.max(now + 0.01, nextStartTime);
+        } else {
+          // Subsequent chunks: start FADE_DURATION earlier to overlap
+          startTime = Math.max(now + 0.01, nextStartTime - FADE_DURATION);
+        }
         
         // Play audio chunk
         const source = audioContext.createBufferSource();
@@ -491,6 +495,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         source.connect(audioContext.destination);
         source.start(startTime);
         
+        // Next chunk starts at the END of this chunk (no overlap subtraction)
         nextStartTime = startTime + audioBuffer.duration;
         audioQueue.push(source);
         chunkCount++;
