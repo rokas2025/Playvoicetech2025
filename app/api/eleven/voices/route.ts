@@ -33,9 +33,19 @@ export async function GET() {
     const data = await response.json();
 
     // Log all voices for debugging
-    console.log('ElevenLabs API returned', data.voices?.length || 0, 'voices');
+    console.log('=== ELEVENLABS VOICES DEBUG ===');
+    console.log('Total voices returned:', data.voices?.length || 0);
+    
     if (data.voices) {
-      console.log('Voice IDs:', data.voices.map((v: any) => `${v.name} (${v.voice_id})`).join(', '));
+      // Check if user's voice is in the list
+      const userVoice = data.voices.find((v: any) => v.voice_id === 'rUjkmAIbnXhCdNuEPZGZ');
+      if (userVoice) {
+        console.log('✅ Found user voice "Rokas":', userVoice);
+      } else {
+        console.log('❌ User voice "Rokas" (rUjkmAIbnXhCdNuEPZGZ) NOT FOUND in API response');
+      }
+      
+      console.log('All voice IDs:', data.voices.map((v: any) => `${v.name} (${v.voice_id})`).join(', '));
     }
 
     // Transform the response to a simpler format - return ALL voices
@@ -48,6 +58,7 @@ export async function GET() {
     })) || [];
 
     console.log('Returning', voices.length, 'voices to frontend');
+    console.log('=== END DEBUG ===');
     return NextResponse.json({ voices });
   } catch (error) {
     console.error('Error fetching voices:', error);
