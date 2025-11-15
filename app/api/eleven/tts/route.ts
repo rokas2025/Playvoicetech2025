@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
       use_speaker_boost: voice_settings?.use_speaker_boost ?? true,
     };
 
-    // Call ElevenLabs TTS API with eleven_v3 model (as per rules - supports Lithuanian)
+    // Call ElevenLabs TTS API with eleven_v3 model (as per rules - supports 70+ languages including Lithuanian)
+    // Reference: https://elevenlabs.io/docs/models#eleven-v3-alpha
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voice_id}/stream?output_format=pcm_16000`,
       {
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           text,
-          model_id: 'eleven_turbo_v2_5', // Turbo v2.5 is the latest production model supporting Lithuanian
+          model_id: 'eleven_v3', // Eleven v3 alpha - most emotionally rich, expressive model
           voice_settings: settings,
           optimize_streaming_latency: 3, // Aggressive streaming for low latency
         }),
