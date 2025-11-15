@@ -504,7 +504,7 @@ export function VoiceChat() {
               onChange={(e) => setTextInput(e.target.value)}
               placeholder="Įveskite savo klausimą lietuviškai..."
               disabled={status !== 'ready'}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white placeholder:text-gray-400"
             />
             <button
               type="submit"

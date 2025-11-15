@@ -185,11 +185,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           <select
             value={selectedVoiceId}
             onChange={(e) => setSelectedVoiceId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white"
           >
-            <option value="">Pasirinkite balsą...</option>
+            <option value="" className="text-gray-500">Pasirinkite balsą...</option>
             {voices.map((voice) => (
-              <option key={voice.id} value={voice.id}>
+              <option key={voice.id} value={voice.id} className="text-gray-900">
                 {voice.name}
               </option>
             ))}
@@ -205,7 +205,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-gray-900 bg-white placeholder:text-gray-400"
             placeholder="Įveskite sistemos pranešimą lietuvių kalba..."
           />
         </div>
