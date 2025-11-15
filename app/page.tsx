@@ -2,10 +2,16 @@
 
 import { VoiceChat } from './components/VoiceChat';
 import { SettingsPanel } from './components/SettingsPanel';
+import { Statistics, type TimingLog } from './components/Statistics';
 import { useState } from 'react';
 
 export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
+  const [timingLogs, setTimingLogs] = useState<TimingLog[]>([]);
+
+  const handleTimingLog = (log: TimingLog) => {
+    setTimingLogs(prev => [...prev, log]);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -29,7 +35,7 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Voice Chat - Takes 2 columns on large screens */}
           <div className={`${showSettings ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-            <VoiceChat />
+            <VoiceChat onTimingLog={handleTimingLog} />
           </div>
 
           {/* Settings Panel - Shows on large screens or when toggled */}
@@ -38,6 +44,11 @@ export default function Home() {
               <SettingsPanel onClose={() => setShowSettings(false)} />
             </div>
           )}
+        </div>
+
+        {/* Statistics Section */}
+        <div className="mt-6">
+          <Statistics logs={timingLogs} />
         </div>
       </main>
 

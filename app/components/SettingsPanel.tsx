@@ -34,6 +34,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
@@ -84,6 +85,61 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       setMessage({ type: 'error', text: 'Nepavyko įkelti duomenų' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTest = async () => {
+    if (!selectedVoiceId || !systemPrompt.trim()) {
+      setMessage({ type: 'error', text: 'Pasirinkite balsą ir įveskite sistemos pranešimą' });
+      return;
+    }
+
+    try {
+      setTesting(true);
+      setMessage(null);
+
+      // Test TTS with system prompt
+      const response = await fetch('/api/eleven/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: systemPrompt,
+          voice_id: selectedVoiceId,
+          voice_settings: voiceSettings,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('TTS test failed');
+      }
+
+      // Play the audio
+      const audioBuffer = await response.arrayBuffer();
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      
+      const audioBufferData = audioContext.createBuffer(1, audioBuffer.byteLength / 2, 16000);
+      const channelData = audioBufferData.getChannelData(0);
+      const view = new Int16Array(audioBuffer);
+      
+      for (let i = 0; i < view.length; i++) {
+        channelData[i] = view[i] / 32768.0;
+      }
+
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBufferData;
+      source.connect(audioContext.destination);
+      source.start(0);
+
+      source.onended = () => {
+        audioContext.close();
+        setTesting(false);
+      };
+
+      setMessage({ type: 'success', text: 'Testuojama...' });
+    } catch (err) {
+      console.error('Error testing voice:', err);
+      setMessage({ type: 'error', text: 'Nepavyko išbandyti balso' });
+      setTesting(false);
     }
   };
 
@@ -213,6 +269,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-gray-900 bg-white placeholder:text-gray-400"
             placeholder="Įveskite sistemos pranešimą lietuvių kalba..."
           />
+          <button
+            onClick={handleTest}
+            disabled={testing || !selectedVoiceId || !systemPrompt.trim()}
+            className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
+          >
+            {testing ? '🔊 Testuojama...' : '🔊 Išbandyti balsą'}
+          </button>
         </div>
 
         {/* Voice Settings */}

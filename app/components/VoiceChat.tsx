@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import type { TimingLog } from './Statistics';
 
 type Message = {
   id: string;
@@ -11,7 +12,11 @@ type Message = {
 
 type Status = 'ready' | 'listening' | 'thinking' | 'speaking';
 
-export function VoiceChat() {
+type VoiceChatProps = {
+  onTimingLog?: (log: TimingLog) => void;
+};
+
+export function VoiceChat({ onTimingLog }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<Status>('ready');
   const [isRecording, setIsRecording] = useState(false);
@@ -147,6 +152,13 @@ export function VoiceChat() {
   };
 
   const processAudio = async (audioBlob: Blob) => {
+    const startTime = performance.now();
+    let sttTime: number | null = null;
+    let llmTime: number | null = null;
+    let ttsTime: number | null = null;
+    let userText = '';
+    let assistantText = '';
+
     try {
       setStatus('thinking');
 
@@ -158,6 +170,7 @@ export function VoiceChat() {
         const base64Audio = reader.result as string;
         
         // Call STT API
+        const sttStart = performance.now();
         const sttResponse = await fetch('/api/eleven/stt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -169,6 +182,8 @@ export function VoiceChat() {
         }
 
         const { text: transcribedText } = await sttResponse.json();
+        sttTime = (performance.now() - sttStart) / 1000;
+        userText = transcribedText;
 
         if (!transcribedText || transcribedText.trim() === '') {
           setError('Nepavyko atpažinti kalbos. Bandykite dar kartą.');
@@ -189,6 +204,7 @@ export function VoiceChat() {
         await saveMessage('user', transcribedText);
 
         // Get LLM response
+        const llmStart = performance.now();
         const llmResponse = await fetch('/api/llm/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -205,6 +221,8 @@ export function VoiceChat() {
         }
 
         const { reply } = await llmResponse.json();
+        llmTime = (performance.now() - llmStart) / 1000;
+        assistantText = reply;
 
         // Add assistant message
         const assistantMessage: Message = {
@@ -217,10 +235,27 @@ export function VoiceChat() {
 
         // Play TTS
         setStatus('speaking');
+        const ttsStart = performance.now();
         const voiceId = await playTTS(reply);
+        ttsTime = (performance.now() - ttsStart) / 1000;
         
         // Save to database with voice ID
         await saveMessage('assistant', reply, voiceId);
+        
+        // Log timing
+        const totalTime = (performance.now() - startTime) / 1000;
+        if (onTimingLog) {
+          onTimingLog({
+            id: Date.now().toString(),
+            timestamp: new Date(),
+            stt_time: sttTime,
+            llm_time: llmTime,
+            tts_time: ttsTime,
+            total_time: totalTime,
+            input_text: userText,
+            output_text: assistantText,
+          });
+        }
         
         setStatus('ready');
       };
@@ -332,6 +367,11 @@ export function VoiceChat() {
     const userText = textInput.trim();
     setTextInput('');
     
+    const startTime = performance.now();
+    let llmTime: number | null = null;
+    let ttsTime: number | null = null;
+    let assistantText = '';
+
     try {
       setStatus('thinking');
       setError(null);
@@ -349,6 +389,7 @@ export function VoiceChat() {
       await saveMessage('user', userText);
 
       // Get LLM response
+      const llmStart = performance.now();
       const llmResponse = await fetch('/api/llm/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -365,6 +406,8 @@ export function VoiceChat() {
       }
 
       const { reply } = await llmResponse.json();
+      llmTime = (performance.now() - llmStart) / 1000;
+      assistantText = reply;
 
       // Add assistant message
       const assistantMessage: Message = {
@@ -377,10 +420,27 @@ export function VoiceChat() {
 
       // Play TTS
       setStatus('speaking');
+      const ttsStart = performance.now();
       const voiceId = await playTTS(reply);
+      ttsTime = (performance.now() - ttsStart) / 1000;
       
       // Save to database with voice ID
       await saveMessage('assistant', reply, voiceId);
+      
+      // Log timing
+      const totalTime = (performance.now() - startTime) / 1000;
+      if (onTimingLog) {
+        onTimingLog({
+          id: Date.now().toString(),
+          timestamp: new Date(),
+          stt_time: null, // No STT for text input
+          llm_time: llmTime,
+          tts_time: ttsTime,
+          total_time: totalTime,
+          input_text: userText,
+          output_text: assistantText,
+        });
+      }
       
       setStatus('ready');
     } catch (err) {
