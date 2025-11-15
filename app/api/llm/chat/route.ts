@@ -45,7 +45,9 @@ Būk mandagus, aiškus ir informatyvus. Atsakyk trumpai ir konkrečiai, nebent p
       model: 'gpt-4o-mini', // Fast and cost-effective
       messages: openaiMessages,
       temperature: 0.7,
-      max_tokens: 500, // Keep responses concise for voice
+      max_tokens: 150, // Shorter responses = faster (was 500)
+      // Optional: Add prediction for even faster responses
+      // prediction: { type: 'content', content: 'Taip,' }, // Uncomment to enable
     });
 
     const reply = completion.choices[0]?.message?.content || 'Atsiprašau, negalėjau sugeneruoti atsakymo.';
