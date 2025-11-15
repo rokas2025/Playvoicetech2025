@@ -8,13 +8,6 @@ type Voice = {
   description?: string;
 };
 
-type Agent = {
-  id: string;
-  name: string;
-  system_prompt: string;
-  default_voice_id: string;
-};
-
 type VoiceSettings = {
   stability: number;
   similarity_boost: number;
@@ -27,10 +20,10 @@ type SettingsPanelProps = {
   onClose?: () => void;
 };
 
+const DEFAULT_AGENT_ID = '00000000-0000-0000-0000-000000000001'; // We'll use a fixed agent ID
+
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [voices, setVoices] = useState<Voice[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState<string>('');
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
@@ -52,25 +45,38 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     try {
       setLoading(true);
 
-      // Load voices
+      // Load voices from ElevenLabs
       const voicesRes = await fetch('/api/eleven/voices');
       if (voicesRes.ok) {
         const voicesData = await voicesRes.json();
         setVoices(voicesData.voices || []);
+      } else {
+        console.error('Failed to load voices:', await voicesRes.text());
       }
 
-      // Load agents
+      // Load saved settings from database
       const agentsRes = await fetch('/api/agents');
       if (agentsRes.ok) {
         const agentsData = await agentsRes.json();
-        setAgents(agentsData.agents || []);
-        
-        // Select first agent by default
         if (agentsData.agents && agentsData.agents.length > 0) {
-          const firstAgent = agentsData.agents[0];
-          setSelectedAgentId(firstAgent.id);
-          setSystemPrompt(firstAgent.system_prompt || '');
-          setSelectedVoiceId(firstAgent.default_voice_id || '');
+          const agent = agentsData.agents[0];
+          setSystemPrompt(agent.system_prompt || '');
+          setSelectedVoiceId(agent.default_voice_id || '');
+        }
+      }
+
+      // Load voice settings
+      const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${DEFAULT_AGENT_ID}`);
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        if (settingsData.preset) {
+          setVoiceSettings({
+            stability: settingsData.preset.stability,
+            similarity_boost: settingsData.preset.similarity_boost,
+            style: settingsData.preset.style,
+            speed: settingsData.preset.speed,
+            use_speaker_boost: settingsData.preset.use_speaker_boost,
+          });
         }
       }
     } catch (err) {
@@ -91,12 +97,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         return;
       }
 
-      // Update agent
+      // Update agent settings
       const agentRes = await fetch('/api/agents', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: selectedAgentId,
+          id: DEFAULT_AGENT_ID,
           system_prompt: systemPrompt,
           default_voice_id: selectedVoiceId,
         }),
@@ -111,7 +117,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agent_id: selectedAgentId,
+          agent_id: DEFAULT_AGENT_ID,
           voice_id: selectedVoiceId,
           ...voiceSettings,
         }),
@@ -171,32 +177,6 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       )}
 
       <div className="space-y-6">
-        {/* Agent Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Agentas
-          </label>
-          <select
-            value={selectedAgentId}
-            onChange={(e) => {
-              const agentId = e.target.value;
-              setSelectedAgentId(agentId);
-              const agent = agents.find(a => a.id === agentId);
-              if (agent) {
-                setSystemPrompt(agent.system_prompt || '');
-                setSelectedVoiceId(agent.default_voice_id || '');
-              }
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          >
-            {agents.map((agent) => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Voice Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
