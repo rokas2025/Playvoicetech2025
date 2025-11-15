@@ -329,6 +329,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
               speed: settingsData.preset.speed,
               use_speaker_boost: settingsData.preset.use_speaker_boost,
               optimize_streaming_latency: settingsData.preset.optimize_streaming_latency,
+              tts_streaming_enabled: settingsData.preset.tts_streaming_enabled,
             };
             voiceId = settingsData.preset.eleven_voice_id;
           }
@@ -355,7 +356,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
 
       // Capture TTS mode from response header
       const ttsMode = response.headers.get('X-TTS-Mode') as 'normal' | 'streaming-v1' || 'normal';
-      addLog('info', 'TTS', `TTS Mode used: ${ttsMode}`);
+      console.log('[TTS] Mode used:', ttsMode);
 
       // Handle PCM audio playback using Web Audio API
       const audioBuffer = await response.arrayBuffer();
