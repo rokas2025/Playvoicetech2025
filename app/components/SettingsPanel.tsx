@@ -94,7 +94,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 style: settingsData.preset.style,
                 speed: settingsData.preset.speed,
                 use_speaker_boost: settingsData.preset.use_speaker_boost,
-                optimize_streaming_latency: settingsData.preset.optimize_streaming_latency ?? 4, // Default to 4 (maximum optimization)
+                optimize_streaming_latency: settingsData.preset.optimize_streaming_latency ?? 3,
               });
             }
           }
@@ -421,7 +421,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     setAgentRole('Pardavimų konsultantė');
                     setAgentTask('Padėti klientams pasirinkti geriausius produktus ir paslaugas');
                     setAgentLocation('Kaunas, Lietuva');
-                    setAgentInfo('Esu energinga pardavimų konsultantė su dideliu produktų žiniomis. Mėgstu padėti žmonėms rasti tai, ko jiems reikia.';
+                    setAgentInfo('Esu energinga pardavimų konsultantė su dideliu produktų žiniomis. Mėgstu padėti žmonėms rasti tai, ko jiems reikia.');
                   }}
                   className="flex-1 px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors text-xs font-medium"
                 >
