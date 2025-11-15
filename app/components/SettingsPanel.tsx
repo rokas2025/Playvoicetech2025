@@ -94,7 +94,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 style: settingsData.preset.style,
                 speed: settingsData.preset.speed,
                 use_speaker_boost: settingsData.preset.use_speaker_boost,
-                optimize_streaming_latency: settingsData.preset.optimize_streaming_latency ?? 3,
+                optimize_streaming_latency: settingsData.preset.optimize_streaming_latency ?? 4, // Default to 4 (maximum optimization)
               });
             }
           }
