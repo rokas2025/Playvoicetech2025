@@ -162,103 +162,99 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     try {
       setStatus('thinking');
 
-      // Convert audio to base64 for STT
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
+      // Call STT API with FormData
+      const sttStart = performance.now();
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'audio.webm');
       
-      reader.onloadend = async () => {
-        const base64Audio = reader.result as string;
-        
-        // Call STT API
-        const sttStart = performance.now();
-        const sttResponse = await fetch('/api/eleven/stt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio: base64Audio }),
-        });
+      const sttResponse = await fetch('/api/eleven/stt', {
+        method: 'POST',
+        body: formData,
+      });
 
-        if (!sttResponse.ok) {
-          throw new Error('STT failed');
-        }
+      if (!sttResponse.ok) {
+        const errorData = await sttResponse.json();
+        console.error('STT error:', errorData);
+        throw new Error(errorData.details || 'STT failed');
+      }
 
-        const { text: transcribedText } = await sttResponse.json();
-        sttTime = (performance.now() - sttStart) / 1000;
-        userText = transcribedText;
+      const { text: transcribedText } = await sttResponse.json();
+      sttTime = (performance.now() - sttStart) / 1000;
+      userText = transcribedText;
 
-        if (!transcribedText || transcribedText.trim() === '') {
-          setError('Nepavyko atpažinti kalbos. Bandykite dar kartą.');
-          setStatus('ready');
-          return;
-        }
-
-        // Add user message
-        const userMessage: Message = {
-          id: Date.now().toString(),
-          role: 'user',
-          text: transcribedText,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, userMessage]);
-        
-        // Save to database
-        await saveMessage('user', transcribedText);
-
-        // Get LLM response
-        const llmStart = performance.now();
-        const llmResponse = await fetch('/api/llm/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [...messages, userMessage].map(m => ({
-              role: m.role,
-              content: m.text,
-            })),
-          }),
-        });
-
-        if (!llmResponse.ok) {
-          throw new Error('LLM failed');
-        }
-
-        const { reply } = await llmResponse.json();
-        llmTime = (performance.now() - llmStart) / 1000;
-        assistantText = reply;
-
-        // Add assistant message
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          text: reply,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-
-        // Play TTS
-        setStatus('speaking');
-        const ttsStart = performance.now();
-        const voiceId = await playTTS(reply);
-        ttsTime = (performance.now() - ttsStart) / 1000;
-        
-        // Save to database with voice ID
-        await saveMessage('assistant', reply, voiceId);
-        
-        // Log timing
-        const totalTime = (performance.now() - startTime) / 1000;
-        if (onTimingLog) {
-          onTimingLog({
-            id: Date.now().toString(),
-            timestamp: new Date(),
-            stt_time: sttTime,
-            llm_time: llmTime,
-            tts_time: ttsTime,
-            total_time: totalTime,
-            input_text: userText,
-            output_text: assistantText,
-          });
-        }
-        
+      if (!transcribedText || transcribedText.trim() === '') {
+        setError('Nepavyko atpažinti kalbos. Bandykite dar kartą.');
         setStatus('ready');
+        return;
+      }
+
+      // Add user message
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        text: transcribedText,
+        timestamp: new Date(),
       };
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Save to database
+      await saveMessage('user', transcribedText);
+
+      // Get LLM response
+      const llmStart = performance.now();
+      const llmResponse = await fetch('/api/llm/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map(m => ({
+            role: m.role,
+            content: m.text,
+          })),
+        }),
+      });
+
+      if (!llmResponse.ok) {
+        throw new Error('LLM failed');
+      }
+
+      const { reply } = await llmResponse.json();
+      llmTime = (performance.now() - llmStart) / 1000;
+      assistantText = reply;
+
+      // Add assistant message
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        text: reply,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // Play TTS
+      setStatus('speaking');
+      const ttsStart = performance.now();
+      const voiceId = await playTTS(reply);
+      ttsTime = (performance.now() - ttsStart) / 1000;
+      
+      // Save to database with voice ID
+      await saveMessage('assistant', reply, voiceId);
+      
+      // Log timing
+      const totalTime = (performance.now() - startTime) / 1000;
+      if (onTimingLog) {
+        onTimingLog({
+          id: Date.now().toString(),
+          timestamp: new Date(),
+          stt_time: sttTime,
+          llm_time: llmTime,
+          tts_time: ttsTime,
+          total_time: totalTime,
+          input_text: userText,
+          output_text: assistantText,
+        });
+      }
+      
+      setStatus('ready');
     } catch (err) {
       console.error('Error processing audio:', err);
       setError('Įvyko klaida apdorojant garsą. Bandykite dar kartą.');

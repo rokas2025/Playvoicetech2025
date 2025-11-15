@@ -5,61 +5,78 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.ELEVENLABS_API_KEY;
 
     if (!apiKey) {
+      console.error('ElevenLabs API key not configured');
       return NextResponse.json(
         { error: 'ElevenLabs API key not configured' },
         { status: 500 }
       );
     }
 
-    const body = await request.json();
-    const { audio } = body;
+    // Get the audio blob directly from FormData
+    const formData = await request.formData();
+    const audioFile = formData.get('audio');
 
-    if (!audio) {
+    if (!audioFile || !(audioFile instanceof Blob)) {
+      console.error('Missing or invalid audio data');
       return NextResponse.json(
-        { error: 'Missing audio data' },
+        { error: 'Missing or invalid audio data' },
         { status: 400 }
       );
     }
 
-    // Convert base64 to buffer
-    const base64Data = audio.replace(/^data:audio\/\w+;base64,/, '');
-    const audioBuffer = Buffer.from(base64Data, 'base64');
+    console.log('Received audio file:', {
+      type: audioFile.type,
+      size: audioFile.size,
+    });
 
-    // Create form data
-    const formData = new FormData();
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
-    formData.append('audio', audioBlob, 'audio.webm');
-    formData.append('model_id', 'eleven_multilingual_v2'); // Best for Lithuanian
-    formData.append('language_code', 'lt'); // Lithuanian
+    // Create new FormData for ElevenLabs API
+    const elevenLabsFormData = new FormData();
+    elevenLabsFormData.append('file', audioFile, 'audio.webm');
+    elevenLabsFormData.append('model_id', 'scribe_v1'); // Scribe v1 supports Lithuanian
+    elevenLabsFormData.append('language_code', 'lt'); // Lithuanian ISO 639-1 code
 
-    // Call ElevenLabs STT API
-    const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+    console.log('Calling ElevenLabs STT API...');
+
+    // Call ElevenLabs STT convert API
+    const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text/convert', {
       method: 'POST',
       headers: {
         'xi-api-key': apiKey,
       },
-      body: formData,
+      body: elevenLabsFormData,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('ElevenLabs STT error:', errorText);
+      console.error('ElevenLabs STT API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      });
       return NextResponse.json(
-        { error: 'Failed to transcribe audio' },
+        { 
+          error: 'Failed to transcribe audio',
+          details: errorText,
+          status: response.status,
+        },
         { status: response.status }
       );
     }
 
     const data = await response.json();
+    console.log('STT success:', {
+      text_length: data.text?.length || 0,
+      language: data.language_code,
+    });
 
     return NextResponse.json({
       text: data.text || '',
-      language: data.language || 'lt',
+      language: data.language_code || 'lt',
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in STT:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
