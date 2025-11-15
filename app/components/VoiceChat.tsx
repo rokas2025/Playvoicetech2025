@@ -403,7 +403,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     });
   };
 
-  // 🚀 STREAMING V2: Chunk-by-chunk playback with cross-fade
+  // 🚀 STREAMING V2: Chunk-by-chunk playback with proper PCM frame alignment
   const playStreamingV2 = async (
     response: Response,
     voiceId: string | null,
@@ -416,6 +416,12 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     let nextStartTime = audioContext.currentTime + 0.05;
     let isPlaying = true;
     const FADE_DURATION = 0.004; // 4ms fade (64 samples @ 16kHz)
+    const FRAME_SIZE_BYTES = 2; // PCM 16-bit mono = 2 bytes per sample
+    const MIN_SAMPLES = 200; // 12.5ms @ 16kHz - skip smaller chunks
+    const SPIKE_THRESHOLD = 0.8; // 80% amplitude jump = suspicious
+
+    // 🎯 LEFTOVER BUFFER: Store incomplete PCM frames between reads
+    let leftover: Uint8Array | null = null;
 
     // Helper: Apply fade in ONLY (no fade out - we'll overlap instead)
     const applyFadeIn = (channelData: Float32Array, fadeLength: number = 64) => {
@@ -429,42 +435,78 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       }
     };
 
+    // 🔍 Helper: Detect suspicious amplitude spikes (broken PCM)
+    const hasSuspiciousSpike = (channelData: Float32Array): boolean => {
+      for (let i = 1; i < channelData.length; i++) {
+        const diff = Math.abs(channelData[i] - channelData[i - 1]);
+        if (diff > SPIKE_THRESHOLD) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     try {
-      console.log('[TTS V2] Starting chunk-by-chunk streaming with cross-fade...');
+      console.log('[TTS V2] Starting streaming with proper PCM frame alignment...');
       
-      // Read and play chunks as they arrive
       let chunkCount = 0;
+      let mutedCount = 0;
+      let skippedCount = 0;
       
       while (true) {
         const { done, value } = await reader.read();
         
         if (done) {
-          console.log('[TTS V2] Stream complete');
+          console.log(`[TTS V2] Stream complete - Played: ${chunkCount}, Muted: ${mutedCount}, Skipped: ${skippedCount}`);
           break;
         }
 
         if (!isPlaying) break;
+        if (!value) continue;
 
-        // Convert chunk to AudioBuffer
-        // Handle odd-length chunks by ensuring even byte count
-        let buffer = value.buffer;
-        let byteLength = buffer.byteLength;
-        
-        // Skip tiny chunks (< 100 samples = 6.25ms) - likely noise/metadata
-        if (byteLength < 200) {
-          console.warn(`[TTS V2] Skipping tiny chunk (${byteLength} bytes)`);
+        // 🎯 STEP 1: Merge leftover bytes from previous read with new chunk
+        let chunk = value;
+        if (leftover && leftover.length > 0) {
+          const merged = new Uint8Array(leftover.length + value.length);
+          merged.set(leftover, 0);
+          merged.set(value, leftover.length);
+          chunk = merged;
+          leftover = null;
+        }
+
+        // 🎯 STEP 2: Extract only FULL PCM frames (2 bytes = 1 sample)
+        const fullFrames = Math.floor(chunk.length / FRAME_SIZE_BYTES);
+        const fullBytes = fullFrames * FRAME_SIZE_BYTES;
+
+        // If chunk is too small for even one frame, save for next iteration
+        if (fullBytes === 0) {
+          leftover = chunk;
           continue;
         }
+
+        // Extract full frames and save remaining bytes for next iteration
+        const audioBytes = chunk.subarray(0, fullBytes);
+        const remaining = chunk.length - fullBytes;
         
-        // If odd byte count, create aligned buffer
-        if (byteLength % 2 !== 0) {
-          const alignedBuffer = new ArrayBuffer(byteLength - 1);
-          new Uint8Array(alignedBuffer).set(new Uint8Array(buffer, 0, byteLength - 1));
-          buffer = alignedBuffer;
-          byteLength = buffer.byteLength;
+        if (remaining > 0) {
+          leftover = chunk.subarray(fullBytes);
         }
+
+        // 🎯 STEP 3: Skip suspiciously small chunks (< 200 samples = 12.5ms)
+        const sampleCount = audioBytes.length / FRAME_SIZE_BYTES;
+        if (sampleCount < MIN_SAMPLES) {
+          console.warn(`[TTS V2] Skipping small chunk: ${sampleCount} samples (${(sampleCount / 16).toFixed(1)}ms)`);
+          skippedCount++;
+          continue;
+        }
+
+        // 🎯 STEP 4: Convert to Int16Array (now guaranteed to be aligned!)
+        const int16Array = new Int16Array(
+          audioBytes.buffer,
+          audioBytes.byteOffset,
+          audioBytes.byteLength / FRAME_SIZE_BYTES
+        );
         
-        const int16Array = new Int16Array(buffer);
         const audioBuffer = audioContext.createBuffer(1, int16Array.length, 16000);
         const channelData = audioBuffer.getChannelData(0);
         
@@ -472,14 +514,20 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         for (let i = 0; i < int16Array.length; i++) {
           channelData[i] = int16Array[i] / 32768.0;
         }
-        
-        // Apply fade in to prevent clicks (no fade out - we overlap instead)
-        applyFadeIn(channelData);
 
-        // Schedule chunk for playback
+        // 🎯 STEP 5: Detect and mute suspicious spikes (broken PCM safety net)
+        if (hasSuspiciousSpike(channelData)) {
+          console.warn(`[TTS V2] Muting chunk ${chunkCount + 1} - suspicious spike detected (broken PCM?)`);
+          channelData.fill(0); // Convert to silence
+          mutedCount++;
+        } else {
+          // Apply fade in to prevent clicks (only if not muted)
+          applyFadeIn(channelData);
+        }
+
+        // 🎯 STEP 6: Schedule chunk for playback with cross-fade overlap
         const now = audioContext.currentTime;
         
-        // ✨ KEY FIX: Overlap by fade duration to create cross-fade
         let startTime;
         if (chunkCount === 0) {
           // First chunk: normal start
@@ -495,7 +543,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         source.connect(audioContext.destination);
         source.start(startTime);
         
-        // Next chunk starts at the END of this chunk (no overlap subtraction)
+        // Next chunk starts at the END of this chunk
         nextStartTime = startTime + audioBuffer.duration;
         audioQueue.push(source);
         chunkCount++;
