@@ -12,7 +12,8 @@ export async function GET() {
     }
 
     // Call ElevenLabs API to get voices (v2 endpoint as per rules)
-    const response = await fetch('https://api.elevenlabs.io/v2/voices', {
+    // Include show_legacy to get ALL voices including custom cloned voices
+    const response = await fetch('https://api.elevenlabs.io/v2/voices?show_legacy=true', {
       method: 'GET',
       headers: {
         'xi-api-key': apiKey,
@@ -31,7 +32,13 @@ export async function GET() {
 
     const data = await response.json();
 
-    // Transform the response to a simpler format
+    // Log all voices for debugging
+    console.log('ElevenLabs API returned', data.voices?.length || 0, 'voices');
+    if (data.voices) {
+      console.log('Voice IDs:', data.voices.map((v: any) => `${v.name} (${v.voice_id})`).join(', '));
+    }
+
+    // Transform the response to a simpler format - return ALL voices
     const voices = data.voices?.map((voice: any) => ({
       id: voice.voice_id,
       name: voice.name,
@@ -40,6 +47,7 @@ export async function GET() {
       preview_url: voice.preview_url || null,
     })) || [];
 
+    console.log('Returning', voices.length, 'voices to frontend');
     return NextResponse.json({ voices });
   } catch (error) {
     console.error('Error fetching voices:', error);
