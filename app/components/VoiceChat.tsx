@@ -248,11 +248,11 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       // Play TTS
       setStatus('speaking');
       const ttsStart = performance.now();
-      const voiceId = await playTTS(reply);
+      const ttsResult = await playTTS(reply);
       ttsTime = (performance.now() - ttsStart) / 1000;
       
       // Save to database with voice ID
-      await saveMessage('assistant', reply, voiceId);
+      await saveMessage('assistant', reply, ttsResult?.voiceId || null);
       
       // Get voice settings for logging
       let logVoiceSettings: any = {};
@@ -286,6 +286,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           input_text: userText,
           output_text: assistantText,
           llm_model: agent?.llm_model,
+          tts_mode: ttsResult?.ttsMode || 'normal',
           ...logVoiceSettings,
         });
       }
@@ -298,7 +299,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     }
   };
 
-  const playTTS = async (text: string): Promise<string | null> => {
+  const playTTS = async (text: string): Promise<{ voiceId: string | null; ttsMode: 'normal' | 'streaming-v1' } | null> => {
     try {
       // Get agent first
       const agentsRes = await fetch('/api/agents');
@@ -352,6 +353,10 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         throw new Error('TTS failed');
       }
 
+      // Capture TTS mode from response header
+      const ttsMode = response.headers.get('X-TTS-Mode') as 'normal' | 'streaming-v1' || 'normal';
+      addLog('info', 'TTS', `TTS Mode used: ${ttsMode}`);
+
       // Handle PCM audio playback using Web Audio API
       const audioBuffer = await response.arrayBuffer();
       const audioContext = new AudioContext({ sampleRate: 16000 });
@@ -369,10 +374,10 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       source.buffer = audioBufferData;
       source.connect(audioContext.destination);
 
-      return new Promise<string | null>((resolve, reject) => {
+      return new Promise<{ voiceId: string | null; ttsMode: 'normal' | 'streaming-v1' }>((resolve, reject) => {
         source.onended = () => {
           audioContext.close();
-          resolve(voiceId);
+          resolve({ voiceId, ttsMode });
         };
         source.start(0);
       });
@@ -469,11 +474,11 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       // Play TTS
       setStatus('speaking');
       const ttsStart = performance.now();
-      const voiceId = await playTTS(reply);
+      const ttsResult = await playTTS(reply);
       ttsTime = (performance.now() - ttsStart) / 1000;
       
       // Save to database with voice ID
-      await saveMessage('assistant', reply, voiceId);
+      await saveMessage('assistant', reply, ttsResult?.voiceId || null);
       
       // Get voice settings for logging
       let logVoiceSettings: any = {};
@@ -507,6 +512,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           input_text: userText,
           output_text: assistantText,
           llm_model: agent?.llm_model,
+          tts_mode: ttsResult?.ttsMode || 'normal',
           ...logVoiceSettings,
         });
       }

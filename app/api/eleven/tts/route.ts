@@ -13,6 +13,14 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { text, voice_id, voice_settings } = body;
+    const streamingEnabled = voice_settings?.tts_streaming_enabled ?? false;
+
+    console.log('[TTS] Request:', {
+      voice_id,
+      text_length: text.length,
+      streaming_enabled: streamingEnabled,
+      timestamp: new Date().toISOString(),
+    });
 
     if (!text || !voice_id) {
       return NextResponse.json(
@@ -67,6 +75,7 @@ export async function POST(request: NextRequest) {
         error: errorText,
         voice_id,
         model_id: 'eleven_v3',
+        streaming_enabled: streamingEnabled,
       });
       return NextResponse.json(
         { 
@@ -79,16 +88,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Stream the PCM audio back to the client
-    const audioBuffer = await response.arrayBuffer();
+    // ✨ CONDITIONAL: Streaming V1 arba Normal buffering
+    if (streamingEnabled) {
+      console.log('[TTS] Using STREAMING V1 mode - direct passthrough');
+      
+      if (!response.body) {
+        console.error('[TTS] No response body from ElevenLabs');
+        return NextResponse.json(
+          { error: 'No response body from upstream' },
+          { status: 502 }
+        );
+      }
 
-    return new NextResponse(audioBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'audio/pcm',
-        'Content-Length': audioBuffer.byteLength.toString(),
-      },
-    });
+      // Stream audio directly - no buffering!
+      return new NextResponse(response.body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'audio/pcm',
+          'X-TTS-Mode': 'streaming-v1', // Custom header for tracking
+        },
+      });
+    } else {
+      console.log('[TTS] Using NORMAL buffering mode');
+      
+      // Traditional buffering (original behavior)
+      const audioBuffer = await response.arrayBuffer();
+      
+      return new NextResponse(audioBuffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'audio/pcm',
+          'Content-Length': audioBuffer.byteLength.toString(),
+          'X-TTS-Mode': 'normal', // Custom header for tracking
+        },
+      });
+    }
   } catch (error) {
     console.error('Error in TTS:', error);
     return NextResponse.json(

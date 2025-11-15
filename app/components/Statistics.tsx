@@ -13,6 +13,7 @@ export type TimingLog = {
   output_text: string;
   // Voice settings used
   llm_model?: string;
+  tts_mode?: 'normal' | 'streaming-v1';
   stability?: number;
   similarity_boost?: number;
   style?: number;
@@ -106,6 +107,7 @@ export function Statistics({ logs, onClear }: StatisticsProps) {
                 <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">LLM</th>
                 <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">TTS</th>
                 <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Viso</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">TTS Režimas</th>
                 <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Modelis</th>
                 <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Stab.</th>
                 <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Panaš.</th>
@@ -134,6 +136,15 @@ export function Statistics({ logs, onClear }: StatisticsProps) {
                   </td>
                   <td className="px-2 py-2 text-indigo-600 font-mono font-bold">
                     {formatTime(log.total_time * 1000)}
+                  </td>
+                  <td className="px-2 py-2 text-gray-700">
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                      log.tts_mode === 'streaming-v1' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {log.tts_mode === 'streaming-v1' ? '⚡ Streaming V1' : '📦 Normal'}
+                    </span>
                   </td>
                   <td className="px-2 py-2 text-gray-700">
                     <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">

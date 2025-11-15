@@ -15,6 +15,7 @@ type VoiceSettings = {
   speed: number;
   use_speaker_boost: boolean;
   optimize_streaming_latency?: number | null;
+  tts_streaming_enabled?: boolean;
 };
 
 type SettingsPanelProps = {
@@ -33,6 +34,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     speed: 1.1, // Slightly faster speech (1.1 = 10% faster)
     use_speaker_boost: false, // Disable for lower latency (adds processing time)
     optimize_streaming_latency: 4, // Maximum optimization (4 = most aggressive)
+    tts_streaming_enabled: false, // Streaming V1 disabled by default (experimental)
   });
   
   // Agent knowledge fields
@@ -95,6 +97,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 speed: settingsData.preset.speed,
                 use_speaker_boost: settingsData.preset.use_speaker_boost,
                 optimize_streaming_latency: settingsData.preset.optimize_streaming_latency ?? 3,
+                tts_streaming_enabled: settingsData.preset.tts_streaming_enabled ?? false,
               });
             }
           }
@@ -478,6 +481,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   speed: 1.1,
                   use_speaker_boost: false,
                   optimize_streaming_latency: 4,
+                  tts_streaming_enabled: false,
                 });
               }}
               className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
@@ -616,6 +620,50 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             </select>
             <p className="text-xs text-gray-500 mt-1">
               ⚡ Rekomenduojama: <strong>4 (Maksimalus)</strong> greičiausiam atsakymui. Jei TTS neveikia, pabandykite išjungti.
+            </p>
+          </div>
+
+          {/* TTS Streaming V1 (Experimental) */}
+          <div className="border-t pt-4 mt-4">
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <span className="text-2xl">⚡</span>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">
+                    Eksperimentinė funkcija
+                  </h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>
+                      TTS Streaming V1 sumažina latency ~40-50%, bet yra beta versija.
+                      Galite lyginti rezultatus su "Normal" režimu statistikoje.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="tts-streaming"
+                checked={voiceSettings.tts_streaming_enabled ?? false}
+                onChange={(e) =>
+                  setVoiceSettings({ 
+                    ...voiceSettings, 
+                    tts_streaming_enabled: e.target.checked 
+                  })
+                }
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="tts-streaming" className="ml-2 text-sm font-medium text-gray-900">
+                🚀 Įjungti TTS Streaming V1 (eksperimentinis)
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-2 ml-6">
+              Streaming režimas siunčia audio chunks iš karto, sumažindamas TTFB ~40-50%.
+              Išjunkite jei pastebite problemas.
             </p>
           </div>
         </div>
