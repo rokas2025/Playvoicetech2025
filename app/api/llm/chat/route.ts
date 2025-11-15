@@ -68,15 +68,15 @@ Būk mandagus, aiškus ir informatyvus. Atsakyk trumpai ir konkrečiai, nebent p
       })),
     ];
 
-    // Determine which model to use
-    const selectedModel = model || 'gpt-4o-mini';
+    // Determine which model to use (default to GPT-4.1 mini - fastest and cheapest)
+    const selectedModel = model || 'gpt-4.1-mini';
     
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
-      model: selectedModel, // User can select: gpt-4o-mini, o1-mini, o3-mini-nano
+      model: selectedModel, // User can select: gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini, etc.
       messages: openaiMessages,
       temperature: 0.7,
-      max_tokens: 500, // Restored to original value for better responses
+      max_tokens: 500, // Good balance between quality and speed
     });
 
     const reply = completion.choices[0]?.message?.content || 'Atsiprašau, negalėjau sugeneruoti atsakymo.';

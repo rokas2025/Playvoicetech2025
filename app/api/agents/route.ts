@@ -25,7 +25,8 @@ export async function GET() {
           name: 'Pagrindinis asistentas',
           description: 'Lietuviškai kalbantis balso asistentas',
           system_prompt: 'Tu esi naudingas balso asistentas. Visada atsakyk lietuvių kalba. Būk mandagus, aiškus ir glaustus.',
-          model_id: 'eleven_v3'
+          model_id: 'eleven_v3',
+          llm_model: 'gpt-4.1-mini'
         })
         .select()
         .single();

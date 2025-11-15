@@ -41,7 +41,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [agentTask, setAgentTask] = useState<string>('Padėti vartotojams su jų klausimais');
   const [agentLocation, setAgentLocation] = useState<string>('Lietuva');
   const [agentInfo, setAgentInfo] = useState<string>('Esu draugiškas AI asistentas, kuris kalba lietuviškai.');
-  const [llmModel, setLlmModel] = useState<string>('gpt-4o-mini');
+  const [llmModel, setLlmModel] = useState<string>('gpt-4.1-mini');
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,7 +81,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           setAgentTask(agent.agent_task || 'Padėti vartotojams su jų klausimais');
           setAgentLocation(agent.agent_location || 'Lietuva');
           setAgentInfo(agent.agent_info || 'Esu draugiškas AI asistentas, kuris kalba lietuviškai.');
-          setLlmModel(agent.llm_model || 'gpt-4o-mini');
+          setLlmModel(agent.llm_model || 'gpt-4.1-mini');
           
           // Load voice settings for this agent
           const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
@@ -388,9 +388,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 onChange={(e) => setLlmModel(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white text-sm"
               >
-                <option value="gpt-4o-mini">GPT-4o Mini (greičiausias, rekomenduojamas)</option>
-                <option value="gpt-4o">GPT-4o (protingesnis, lėtesnis)</option>
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo (seniausias, pigiausias)</option>
+                <option value="gpt-4.1-mini">GPT-4.1 Mini (greičiausias, 83% pigesnis, NAUJAS! ⚡)</option>
+                <option value="gpt-4.1-nano">GPT-4.1 Nano (mažiausias, dar greitesnis)</option>
+                <option value="gpt-4o-mini">GPT-4o Mini (senas greitas modelis)</option>
+                <option value="gpt-4.1">GPT-4.1 (naujas protingiausias)</option>
+                <option value="gpt-4o">GPT-4o (senas protingas)</option>
+                <option value="gpt-3.5-turbo">GPT-3.5 Turbo (seniausias)</option>
               </select>
             </div>
 

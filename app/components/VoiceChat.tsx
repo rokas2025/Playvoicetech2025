@@ -216,7 +216,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
             role: m.role,
             content: m.text,
           })),
-          model: agent?.llm_model || 'gpt-4o-mini',
+          model: agent?.llm_model || 'gpt-4.1-mini',
           system_prompt: agent?.system_prompt,
           agent_knowledge: {
             agent_name: agent?.agent_name,
@@ -415,7 +415,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
             role: m.role,
             content: m.text,
           })),
-          model: agent?.llm_model || 'gpt-4o-mini',
+          model: agent?.llm_model || 'gpt-4.1-mini',
           system_prompt: agent?.system_prompt,
           agent_knowledge: {
             agent_name: agent?.agent_name,
