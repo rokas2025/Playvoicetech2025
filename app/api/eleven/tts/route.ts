@@ -30,6 +30,20 @@ export async function POST(request: NextRequest) {
       use_speaker_boost: voice_settings?.use_speaker_boost ?? true,
     };
 
+    // Build request body
+    const requestBody: any = {
+      text,
+      model_id: 'eleven_v3', // Eleven v3 alpha - most emotionally rich, expressive model
+      voice_settings: settings,
+    };
+
+    // Only add optimize_streaming_latency if it's explicitly set (not null/undefined)
+    // Some voices may not work with this parameter
+    const optimizeLatency = voice_settings?.optimize_streaming_latency;
+    if (optimizeLatency !== null && optimizeLatency !== undefined) {
+      requestBody.optimize_streaming_latency = optimizeLatency;
+    }
+
     // Call ElevenLabs TTS API with eleven_v3 model (as per rules - supports 70+ languages including Lithuanian)
     // Reference: https://elevenlabs.io/docs/models#eleven-v3-alpha
     const response = await fetch(
@@ -41,12 +55,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
           'Accept': 'audio/pcm',
         },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_v3', // Eleven v3 alpha - most emotionally rich, expressive model
-          voice_settings: settings,
-          optimize_streaming_latency: 3, // Aggressive streaming for low latency
-        }),
+        body: JSON.stringify(requestBody),
       }
     );
 

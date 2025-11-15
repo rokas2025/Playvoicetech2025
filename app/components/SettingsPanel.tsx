@@ -14,6 +14,7 @@ type VoiceSettings = {
   style: number;
   speed: number;
   use_speaker_boost: boolean;
+  optimize_streaming_latency?: number | null;
 };
 
 type SettingsPanelProps = {
@@ -31,6 +32,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     style: 0.0,
     speed: 1.0,
     use_speaker_boost: true,
+    optimize_streaming_latency: 3, // Default: 3 (aggressive), null = disabled
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,6 +77,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 style: settingsData.preset.style,
                 speed: settingsData.preset.speed,
                 use_speaker_boost: settingsData.preset.use_speaker_boost,
+                optimize_streaming_latency: settingsData.preset.optimize_streaming_latency ?? 3,
               });
             }
           }
@@ -368,6 +371,34 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             <label htmlFor="speaker-boost" className="ml-2 text-sm text-gray-700">
               Garsiakalbio pastiprinimas
             </label>
+          </div>
+
+          {/* Optimize Streaming Latency */}
+          <div>
+            <label className="block text-sm text-gray-700 mb-2">
+              Streaming optimizavimas (latency)
+            </label>
+            <select
+              value={voiceSettings.optimize_streaming_latency ?? 'disabled'}
+              onChange={(e) => {
+                const val = e.target.value;
+                setVoiceSettings({
+                  ...voiceSettings,
+                  optimize_streaming_latency: val === 'disabled' ? null : parseInt(val),
+                });
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white"
+            >
+              <option value="disabled">Išjungta (gali padėti su kai kuriais balsais)</option>
+              <option value="0">0 - Mažiausias (aukščiausia kokybė)</option>
+              <option value="1">1 - Žemas</option>
+              <option value="2">2 - Vidutinis</option>
+              <option value="3">3 - Agresyvus (mažiausia latency)</option>
+              <option value="4">4 - Maksimalus (greičiausias)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Jei TTS neveikia, pabandykite išjungti šį nustatymą
+            </p>
           </div>
         </div>
 
