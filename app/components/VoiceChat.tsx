@@ -415,6 +415,15 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     let audioQueue: AudioBufferSourceNode[] = [];
     let nextStartTime = audioContext.currentTime;
     let isPlaying = true;
+    let lastChunkEndTime = audioContext.currentTime;
+
+    // Helper: Create silence buffer to fill gaps
+    const createSilenceBuffer = (duration: number): AudioBuffer => {
+      const sampleCount = Math.ceil(duration * 16000);
+      const buffer = audioContext.createBuffer(1, sampleCount, 16000);
+      // Already filled with zeros (silence)
+      return buffer;
+    };
 
     try {
       console.log('[TTS V2] Starting chunk-by-chunk streaming...');
@@ -453,17 +462,31 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         }
 
         // Schedule chunk for playback
+        const now = audioContext.currentTime;
+        const startTime = Math.max(now + 0.01, nextStartTime);
+        
+        // ✨ SILENCE PADDING: If there's a gap, fill it with silence
+        const gap = startTime - lastChunkEndTime;
+        if (gap > 0.01) { // Gap larger than 10ms
+          console.warn(`[TTS V2] Gap detected (${(gap * 1000).toFixed(0)}ms), filling with silence`);
+          const silenceBuffer = createSilenceBuffer(gap);
+          const silenceSource = audioContext.createBufferSource();
+          silenceSource.buffer = silenceBuffer;
+          silenceSource.connect(audioContext.destination);
+          silenceSource.start(lastChunkEndTime);
+        }
+        
+        // Play audio chunk
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
+        source.start(startTime);
         
-        // Schedule to play after previous chunk
-        source.start(nextStartTime);
-        nextStartTime += audioBuffer.duration;
-        
+        nextStartTime = startTime + audioBuffer.duration;
+        lastChunkEndTime = nextStartTime;
         audioQueue.push(source);
         
-        console.log(`[TTS V2] Playing chunk (${int16Array.length} samples, ${audioBuffer.duration.toFixed(2)}s)`);
+        console.log(`[TTS V2] Chunk ${audioQueue.length}: ${int16Array.length} samples (${audioBuffer.duration.toFixed(2)}s) @ ${startTime.toFixed(2)}s`);
       }
 
       // Wait for all chunks to finish
