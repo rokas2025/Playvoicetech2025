@@ -30,10 +30,13 @@ export async function POST(request: NextRequest) {
     });
 
     // Create new FormData for ElevenLabs API
+    // Reference: https://elevenlabs.io/docs/capabilities/speech-to-text
     const elevenLabsFormData = new FormData();
     elevenLabsFormData.append('file', audioFile, 'audio.webm');
-    elevenLabsFormData.append('model_id', 'scribe_v1'); // Scribe v1 supports Lithuanian
+    elevenLabsFormData.append('model_id', 'scribe_v1'); // Scribe v1 supports 99 languages including Lithuanian
     elevenLabsFormData.append('language_code', 'lt'); // Lithuanian ISO 639-1 code
+    // Optional: Add timestamps for word-level timing (useful for future features)
+    // elevenLabsFormData.append('timestamps_granularity', 'word');
 
     console.log('Calling ElevenLabs STT API...');
 
