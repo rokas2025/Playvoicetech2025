@@ -27,12 +27,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState<string>('');
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
-    stability: 0.5,
-    similarity_boost: 0.8,
-    style: 0.0,
-    speed: 1.0,
-    use_speaker_boost: true,
-    optimize_streaming_latency: 3, // Default: 3 (aggressive), null = disabled
+    stability: 0.4, // Lower = faster processing (0.4 recommended for speed)
+    similarity_boost: 0.75, // Slightly lower for faster generation
+    style: 0.0, // Keep at 0 for fastest response
+    speed: 1.1, // Slightly faster speech (1.1 = 10% faster)
+    use_speaker_boost: false, // Disable for lower latency (adds processing time)
+    optimize_streaming_latency: 4, // Maximum optimization (4 = most aggressive)
   });
   
   // Agent knowledge fields
@@ -472,17 +472,17 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             <button
               onClick={() => {
                 setVoiceSettings({
-                  stability: 0.5,
-                  similarity_boost: 0.8,
+                  stability: 0.4,
+                  similarity_boost: 0.75,
                   style: 0.0,
-                  speed: 1.0,
-                  use_speaker_boost: true,
-                  optimize_streaming_latency: 3,
+                  speed: 1.1,
+                  use_speaker_boost: false,
+                  optimize_streaming_latency: 4,
                 });
               }}
               className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
             >
-              ↻ Atstatyti į numatytuosius
+              ↻ Atstatyti į numatytuosius (greičiui)
             </button>
           </div>
 
@@ -502,6 +502,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               }
               className="w-full"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              ⚡ Greičiui: 0.3-0.5 (žemesnis = greitesnis)
+            </p>
           </div>
 
           {/* Similarity Boost */}
@@ -520,6 +523,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               }
               className="w-full"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              ⚡ Greičiui: 0.7-0.8 (žemesnis = greitesnis)
+            </p>
           </div>
 
           {/* Style */}
@@ -538,6 +544,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               }
               className="w-full"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              ⚡ Greičiui: 0.0 (laikykite 0 greičiausiam atsakymui)
+            </p>
           </div>
 
           {/* Speed */}
@@ -556,22 +565,30 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               }
               className="w-full"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              ⚡ Greičiui: 1.1-1.2 (didesnis = greitesnis kalbėjimas)
+            </p>
           </div>
 
           {/* Speaker Boost */}
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="speaker-boost"
-              checked={voiceSettings.use_speaker_boost}
-              onChange={(e) =>
-                setVoiceSettings({ ...voiceSettings, use_speaker_boost: e.target.checked })
-              }
-              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-            />
-            <label htmlFor="speaker-boost" className="ml-2 text-sm text-gray-700">
-              Garsiakalbio pastiprinimas
-            </label>
+          <div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="speaker-boost"
+                checked={voiceSettings.use_speaker_boost}
+                onChange={(e) =>
+                  setVoiceSettings({ ...voiceSettings, use_speaker_boost: e.target.checked })
+                }
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <label htmlFor="speaker-boost" className="ml-2 text-sm text-gray-700">
+                Garsiakalbio pastiprinimas
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-1 ml-6">
+              ⚡ Greičiui: <strong>Išjungti</strong> (prideda apdorojimo laiką)
+            </p>
           </div>
 
           {/* Optimize Streaming Latency */}
@@ -598,7 +615,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               <option value="4">4 - Maksimalus (greičiausias)</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Jei TTS neveikia, pabandykite išjungti šį nustatymą
+              ⚡ Rekomenduojama: <strong>4 (Maksimalus)</strong> greičiausiam atsakymui. Jei TTS neveikia, pabandykite išjungti.
             </p>
           </div>
         </div>
