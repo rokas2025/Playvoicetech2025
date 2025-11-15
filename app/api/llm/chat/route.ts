@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { messages, system_prompt } = body;
+    const { messages, system_prompt, model } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -40,14 +40,15 @@ Būk mandagus, aiškus ir informatyvus. Atsakyk trumpai ir konkrečiai, nebent p
       })),
     ];
 
+    // Determine which model to use
+    const selectedModel = model || 'gpt-4o-mini';
+    
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Fast and cost-effective
+      model: selectedModel, // User can select: gpt-4o-mini, o1-mini, o3-mini-nano
       messages: openaiMessages,
       temperature: 0.7,
-      max_tokens: 150, // Shorter responses = faster (was 500)
-      // Optional: Add prediction for even faster responses
-      // prediction: { type: 'content', content: 'Taip,' }, // Uncomment to enable
+      max_tokens: 500, // Restored to original value for better responses
     });
 
     const reply = completion.choices[0]?.message?.content || 'Atsiprašau, negalėjau sugeneruoti atsakymo.';

@@ -34,6 +34,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     use_speaker_boost: true,
     optimize_streaming_latency: 3, // Default: 3 (aggressive), null = disabled
   });
+  
+  // Agent knowledge fields
+  const [agentName, setAgentName] = useState<string>('AI Asistentas');
+  const [agentRole, setAgentRole] = useState<string>('Virtualus asistentas');
+  const [agentTask, setAgentTask] = useState<string>('Padėti vartotojams su jų klausimais');
+  const [agentLocation, setAgentLocation] = useState<string>('Lietuva');
+  const [agentInfo, setAgentInfo] = useState<string>('Esu draugiškas AI asistentas, kuris kalba lietuviškai.');
+  const [llmModel, setLlmModel] = useState<string>('gpt-4o-mini');
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -62,9 +71,17 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         const agentsData = await agentsRes.json();
         if (agentsData.agents && agentsData.agents.length > 0) {
           const agent = agentsData.agents[0];
-          setAgentId(agent.id); // Store the actual agent ID
+          setAgentId(agent.id);
           setSystemPrompt(agent.system_prompt || '');
           setSelectedVoiceId(agent.default_voice_id || '');
+          
+          // Load agent knowledge fields
+          setAgentName(agent.agent_name || 'AI Asistentas');
+          setAgentRole(agent.agent_role || 'Virtualus asistentas');
+          setAgentTask(agent.agent_task || 'Padėti vartotojams su jų klausimais');
+          setAgentLocation(agent.agent_location || 'Lietuva');
+          setAgentInfo(agent.agent_info || 'Esu draugiškas AI asistentas, kuris kalba lietuviškai.');
+          setLlmModel(agent.llm_model || 'gpt-4o-mini');
           
           // Load voice settings for this agent
           const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
@@ -161,7 +178,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         return;
       }
 
-      // Update agent settings
+      // Update agent settings including knowledge fields
       const agentRes = await fetch('/api/agents', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -169,6 +186,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           id: agentId,
           system_prompt: systemPrompt,
           default_voice_id: selectedVoiceId,
+          agent_name: agentName,
+          agent_role: agentRole,
+          agent_task: agentTask,
+          agent_location: agentLocation,
+          agent_info: agentInfo,
+          llm_model: llmModel,
         }),
       });
 
@@ -278,6 +301,144 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           <p className="text-xs text-gray-500 mt-1">
             Naudokite šį lauką, jei jūsų balsas nematomas dropdown'e
           </p>
+        </div>
+
+        {/* Agent Knowledge Section */}
+        <div className="border-2 border-indigo-200 rounded-lg p-4 bg-indigo-50">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">📋 Agento žinios</h3>
+          
+          <div className="space-y-3">
+            {/* Agent Name */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Vardas
+              </label>
+              <input
+                type="text"
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white text-sm"
+                placeholder="pvz: Rokas"
+              />
+            </div>
+
+            {/* Agent Role */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Profesija / Rolė
+              </label>
+              <input
+                type="text"
+                value={agentRole}
+                onChange={(e) => setAgentRole(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white text-sm"
+                placeholder="pvz: Klientų aptarnavimo specialistas"
+              />
+            </div>
+
+            {/* Agent Task */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Užduotis
+              </label>
+              <input
+                type="text"
+                value={agentTask}
+                onChange={(e) => setAgentTask(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white text-sm"
+                placeholder="pvz: Padėti klientams su užsakymais"
+              />
+            </div>
+
+            {/* Agent Location */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Vieta
+              </label>
+              <input
+                type="text"
+                value={agentLocation}
+                onChange={(e) => setAgentLocation(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white text-sm"
+                placeholder="pvz: Vilnius, Lietuva"
+              />
+            </div>
+
+            {/* Agent Info */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Papildoma informacija
+              </label>
+              <textarea
+                value={agentInfo}
+                onChange={(e) => setAgentInfo(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-gray-900 bg-white text-sm"
+                placeholder="Įveskite papildomą informaciją apie agentą..."
+              />
+            </div>
+
+            {/* LLM Model Selection */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                LLM Modelis
+              </label>
+              <select
+                value={llmModel}
+                onChange={(e) => setLlmModel(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white text-sm"
+              >
+                <option value="gpt-4o-mini">GPT-4o Mini (greičiausias)</option>
+                <option value="o1-mini">o1-mini (protingesnis)</option>
+                <option value="o3-mini-nano">o3-mini-nano (mažiausias)</option>
+              </select>
+            </div>
+
+            {/* Quick Knowledge Templates */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-2">
+                Greitos šablonai
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setAgentName('Rokas');
+                    setAgentRole('Klientų aptarnavimo vadybininkas');
+                    setAgentTask('Padėti klientams su užsakymais ir atsakyti į klausimus');
+                    setAgentLocation('Vilnius, Lietuva');
+                    setAgentInfo('Esu draugiškas ir profesionalus klientų aptarnavimo specialistas. Mano tikslas - užtikrinti puikią klientų patirtį.';
+                  }}
+                  className="flex-1 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-xs font-medium"
+                >
+                  👔 Klientų aptarnavimas
+                </button>
+                <button
+                  onClick={() => {
+                    setAgentName('Laura');
+                    setAgentRole('Pardavimų konsultantė');
+                    setAgentTask('Padėti klientams pasirinkti geriausius produktus ir paslaugas');
+                    setAgentLocation('Kaunas, Lietuva');
+                    setAgentInfo('Esu energinga pardavimų konsultantė su dideliu produktų žiniomis. Mėgstu padėti žmonėms rasti tai, ko jiems reikia.';
+                  }}
+                  className="flex-1 px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors text-xs font-medium"
+                >
+                  💼 Pardavimai
+                </button>
+                <button
+                  onClick={() => {
+                    setAgentName('Jonas');
+                    setAgentRole('Techninis palaikymo specialistas');
+                    setAgentTask('Spręsti technines problemas ir padėti su programine įranga');
+                    setAgentLocation('Klaipėda, Lietuva');
+                    setAgentInfo('Esu patyręs IT specialistas, kuris mėgsta spręsti sudėtingas technines problemas. Stengiuosi viską paaiškinti paprastai ir suprantamai.');
+                  }}
+                  className="flex-1 px-3 py-2 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition-colors text-xs font-medium"
+                >
+                  🔧 IT Palaikymas
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* System Prompt */}

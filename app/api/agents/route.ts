@@ -55,7 +55,17 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, system_prompt, default_voice_id } = body;
+    const { 
+      id, 
+      system_prompt, 
+      default_voice_id,
+      agent_name,
+      agent_role,
+      agent_task,
+      agent_location,
+      agent_info,
+      llm_model
+    } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -67,6 +77,12 @@ export async function PUT(request: NextRequest) {
     const updateData: any = {};
     if (system_prompt !== undefined) updateData.system_prompt = system_prompt;
     if (default_voice_id !== undefined) updateData.default_voice_id = default_voice_id;
+    if (agent_name !== undefined) updateData.agent_name = agent_name;
+    if (agent_role !== undefined) updateData.agent_role = agent_role;
+    if (agent_task !== undefined) updateData.agent_task = agent_task;
+    if (agent_location !== undefined) updateData.agent_location = agent_location;
+    if (agent_info !== undefined) updateData.agent_info = agent_info;
+    if (llm_model !== undefined) updateData.llm_model = llm_model;
 
     const { data, error } = await supabase
       .from('agents')

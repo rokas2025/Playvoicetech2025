@@ -200,8 +200,14 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       // Save to database
       await saveMessage('user', transcribedText);
 
-      // Get LLM response
+      // Get LLM response (with agent knowledge)
       const llmStart = performance.now();
+      
+      // Fetch agent settings to get model and knowledge
+      const agentRes = await fetch('/api/agents');
+      const agentData = await agentRes.json();
+      const agent = agentData.agents?.[0];
+      
       const llmResponse = await fetch('/api/llm/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -210,6 +216,8 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
             role: m.role,
             content: m.text,
           })),
+          model: agent?.llm_model || 'gpt-4o-mini',
+          system_prompt: agent?.system_prompt,
         }),
       });
 
@@ -384,8 +392,14 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       // Save to database
       await saveMessage('user', userText);
 
-      // Get LLM response
+      // Get LLM response (with agent knowledge)
       const llmStart = performance.now();
+      
+      // Fetch agent settings to get model and knowledge
+      const agentRes = await fetch('/api/agents');
+      const agentData = await agentRes.json();
+      const agent = agentData.agents?.[0];
+      
       const llmResponse = await fetch('/api/llm/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -394,6 +408,8 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
             role: m.role,
             content: m.text,
           })),
+          model: agent?.llm_model || 'gpt-4o-mini',
+          system_prompt: agent?.system_prompt,
         }),
       });
 
