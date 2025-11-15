@@ -254,7 +254,26 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       // Save to database with voice ID
       await saveMessage('assistant', reply, voiceId);
       
-      // Log timing
+      // Get voice settings for logging
+      let logVoiceSettings: any = {};
+      if (agent) {
+        const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          if (settingsData.preset) {
+            logVoiceSettings = {
+              stability: settingsData.preset.stability,
+              similarity_boost: settingsData.preset.similarity_boost,
+              style: settingsData.preset.style,
+              speed: settingsData.preset.speed,
+              use_speaker_boost: settingsData.preset.use_speaker_boost,
+              optimize_streaming_latency: settingsData.preset.optimize_streaming_latency,
+            };
+          }
+        }
+      }
+      
+      // Log timing with settings
       const totalTime = (performance.now() - startTime) / 1000;
       if (onTimingLog) {
         onTimingLog({
@@ -266,6 +285,8 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           total_time: totalTime,
           input_text: userText,
           output_text: assistantText,
+          llm_model: agent?.llm_model,
+          ...logVoiceSettings,
         });
       }
       
@@ -306,6 +327,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
               style: settingsData.preset.style,
               speed: settingsData.preset.speed,
               use_speaker_boost: settingsData.preset.use_speaker_boost,
+              optimize_streaming_latency: settingsData.preset.optimize_streaming_latency,
             };
             voiceId = settingsData.preset.eleven_voice_id;
           }
@@ -453,7 +475,26 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       // Save to database with voice ID
       await saveMessage('assistant', reply, voiceId);
       
-      // Log timing
+      // Get voice settings for logging
+      let logVoiceSettings: any = {};
+      if (agent) {
+        const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          if (settingsData.preset) {
+            logVoiceSettings = {
+              stability: settingsData.preset.stability,
+              similarity_boost: settingsData.preset.similarity_boost,
+              style: settingsData.preset.style,
+              speed: settingsData.preset.speed,
+              use_speaker_boost: settingsData.preset.use_speaker_boost,
+              optimize_streaming_latency: settingsData.preset.optimize_streaming_latency,
+            };
+          }
+        }
+      }
+      
+      // Log timing with settings
       const totalTime = (performance.now() - startTime) / 1000;
       if (onTimingLog) {
         onTimingLog({
@@ -465,6 +506,8 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           total_time: totalTime,
           input_text: userText,
           output_text: assistantText,
+          llm_model: agent?.llm_model,
+          ...logVoiceSettings,
         });
       }
       

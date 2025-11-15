@@ -11,6 +11,14 @@ export type TimingLog = {
   total_time: number;
   input_text: string;
   output_text: string;
+  // Voice settings used
+  llm_model?: string;
+  stability?: number;
+  similarity_boost?: number;
+  style?: number;
+  speed?: number;
+  use_speaker_boost?: boolean;
+  optimize_streaming_latency?: number | null;
 };
 
 type StatisticsProps = {
@@ -93,37 +101,71 @@ export function Statistics({ logs, onClear }: StatisticsProps) {
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-2 text-left text-gray-700 font-semibold">Laikas</th>
-                <th className="px-4 py-2 text-left text-gray-700 font-semibold">STT</th>
-                <th className="px-4 py-2 text-left text-gray-700 font-semibold">LLM</th>
-                <th className="px-4 py-2 text-left text-gray-700 font-semibold">TTS</th>
-                <th className="px-4 py-2 text-left text-gray-700 font-semibold">Viso</th>
-                <th className="px-4 py-2 text-left text-gray-700 font-semibold">Įvestis</th>
-                <th className="px-4 py-2 text-left text-gray-700 font-semibold">Išvestis</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Laikas</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">STT</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">LLM</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">TTS</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Viso</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Modelis</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Stab.</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Panaš.</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Stil.</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Greit.</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Boost</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Opt.</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Įvestis</th>
+                <th className="px-2 py-2 text-left text-gray-700 font-semibold text-xs">Išvestis</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {logs.slice().reverse().map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 text-gray-600">
+                <tr key={log.id} className="hover:bg-gray-50 text-xs">
+                  <td className="px-2 py-2 text-gray-600">
                     {log.timestamp.toLocaleTimeString('lt-LT')}
                   </td>
-                  <td className="px-4 py-2 text-blue-600 font-mono">
+                  <td className="px-2 py-2 text-blue-600 font-mono">
                     {formatTime(log.stt_time ? log.stt_time * 1000 : null)}
                   </td>
-                  <td className="px-4 py-2 text-green-600 font-mono">
+                  <td className="px-2 py-2 text-green-600 font-mono">
                     {formatTime(log.llm_time ? log.llm_time * 1000 : null)}
                   </td>
-                  <td className="px-4 py-2 text-purple-600 font-mono">
+                  <td className="px-2 py-2 text-purple-600 font-mono">
                     {formatTime(log.tts_time ? log.tts_time * 1000 : null)}
                   </td>
-                  <td className="px-4 py-2 text-indigo-600 font-mono font-bold">
+                  <td className="px-2 py-2 text-indigo-600 font-mono font-bold">
                     {formatTime(log.total_time * 1000)}
                   </td>
-                  <td className="px-4 py-2 text-gray-700 max-w-xs truncate">
+                  <td className="px-2 py-2 text-gray-700">
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                      {log.llm_model || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-gray-700 font-mono">
+                    {log.stability?.toFixed(2) || '-'}
+                  </td>
+                  <td className="px-2 py-2 text-gray-700 font-mono">
+                    {log.similarity_boost?.toFixed(2) || '-'}
+                  </td>
+                  <td className="px-2 py-2 text-gray-700 font-mono">
+                    {log.style?.toFixed(2) || '-'}
+                  </td>
+                  <td className="px-2 py-2 text-gray-700 font-mono">
+                    {log.speed?.toFixed(2) || '-'}
+                  </td>
+                  <td className="px-2 py-2 text-center">
+                    {log.use_speaker_boost ? (
+                      <span className="text-green-600">✓</span>
+                    ) : (
+                      <span className="text-red-600">✗</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 text-gray-700 font-mono">
+                    {log.optimize_streaming_latency ?? '-'}
+                  </td>
+                  <td className="px-2 py-2 text-gray-700 max-w-xs truncate">
                     {log.input_text}
                   </td>
-                  <td className="px-4 py-2 text-gray-700 max-w-xs truncate">
+                  <td className="px-2 py-2 text-gray-700 max-w-xs truncate">
                     {log.output_text}
                   </td>
                 </tr>
