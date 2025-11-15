@@ -403,7 +403,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     });
   };
 
-  // 🚀 STREAMING V2: Chunk-by-chunk playback
+  // 🚀 STREAMING V2: Chunk-by-chunk playback with smooth transitions
   const playStreamingV2 = async (
     response: Response,
     voiceId: string | null,
@@ -413,22 +413,33 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     const reader = response.body!.getReader();
     
     let audioQueue: AudioBufferSourceNode[] = [];
-    let nextStartTime = audioContext.currentTime;
+    let nextStartTime = audioContext.currentTime + 0.05; // Initial buffer
     let isPlaying = true;
-    let lastChunkEndTime = audioContext.currentTime;
 
-    // Helper: Create silence buffer to fill gaps
-    const createSilenceBuffer = (duration: number): AudioBuffer => {
-      const sampleCount = Math.ceil(duration * 16000);
-      const buffer = audioContext.createBuffer(1, sampleCount, 16000);
-      // Already filled with zeros (silence)
-      return buffer;
+    // Helper: Apply fade in/out to prevent clicks
+    const applyFades = (channelData: Float32Array, fadeLength: number = 64) => {
+      const len = channelData.length;
+      const actualFadeLength = Math.min(fadeLength, Math.floor(len / 4));
+      
+      // Fade in (first samples)
+      for (let i = 0; i < actualFadeLength; i++) {
+        const gain = i / actualFadeLength;
+        channelData[i] *= gain;
+      }
+      
+      // Fade out (last samples)
+      for (let i = 0; i < actualFadeLength; i++) {
+        const gain = i / actualFadeLength;
+        channelData[len - 1 - i] *= gain;
+      }
     };
 
     try {
-      console.log('[TTS V2] Starting chunk-by-chunk streaming...');
+      console.log('[TTS V2] Starting chunk-by-chunk streaming with smooth transitions...');
       
       // Read and play chunks as they arrive
+      let chunkCount = 0;
+      
       while (true) {
         const { done, value } = await reader.read();
         
@@ -444,9 +455,14 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         let buffer = value.buffer;
         let byteLength = buffer.byteLength;
         
+        // Skip tiny chunks (< 100 samples = 6.25ms) - likely noise/metadata
+        if (byteLength < 200) {
+          console.warn(`[TTS V2] Skipping tiny chunk (${byteLength} bytes)`);
+          continue;
+        }
+        
         // If odd byte count, create aligned buffer
         if (byteLength % 2 !== 0) {
-          console.warn(`[TTS V2] Odd chunk size (${byteLength} bytes), aligning...`);
           const alignedBuffer = new ArrayBuffer(byteLength - 1);
           new Uint8Array(alignedBuffer).set(new Uint8Array(buffer, 0, byteLength - 1));
           buffer = alignedBuffer;
@@ -457,24 +473,17 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         const audioBuffer = audioContext.createBuffer(1, int16Array.length, 16000);
         const channelData = audioBuffer.getChannelData(0);
         
+        // Convert to float32 and normalize
         for (let i = 0; i < int16Array.length; i++) {
           channelData[i] = int16Array[i] / 32768.0;
         }
+        
+        // Apply smooth fades to prevent clicks
+        applyFades(channelData);
 
         // Schedule chunk for playback
         const now = audioContext.currentTime;
         const startTime = Math.max(now + 0.01, nextStartTime);
-        
-        // ✨ SILENCE PADDING: If there's a gap, fill it with silence
-        const gap = startTime - lastChunkEndTime;
-        if (gap > 0.01) { // Gap larger than 10ms
-          console.warn(`[TTS V2] Gap detected (${(gap * 1000).toFixed(0)}ms), filling with silence`);
-          const silenceBuffer = createSilenceBuffer(gap);
-          const silenceSource = audioContext.createBufferSource();
-          silenceSource.buffer = silenceBuffer;
-          silenceSource.connect(audioContext.destination);
-          silenceSource.start(lastChunkEndTime);
-        }
         
         // Play audio chunk
         const source = audioContext.createBufferSource();
@@ -483,10 +492,10 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         source.start(startTime);
         
         nextStartTime = startTime + audioBuffer.duration;
-        lastChunkEndTime = nextStartTime;
         audioQueue.push(source);
+        chunkCount++;
         
-        console.log(`[TTS V2] Chunk ${audioQueue.length}: ${int16Array.length} samples (${audioBuffer.duration.toFixed(2)}s) @ ${startTime.toFixed(2)}s`);
+        console.log(`[TTS V2] Chunk ${chunkCount}: ${int16Array.length} samples (${audioBuffer.duration.toFixed(2)}s) @ ${startTime.toFixed(2)}s`);
       }
 
       // Wait for all chunks to finish
