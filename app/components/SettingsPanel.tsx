@@ -409,7 +409,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     setAgentRole('Klientų aptarnavimo vadybininkas');
                     setAgentTask('Padėti klientams su užsakymais ir atsakyti į klausimus');
                     setAgentLocation('Vilnius, Lietuva');
-                    setAgentInfo('Esu draugiškas ir profesionalus klientų aptarnavimo specialistas. Mano tikslas - užtikrinti puikią klientų patirtį.';
+                    setAgentInfo('Esu draugiškas ir profesionalus klientų aptarnavimo specialistas. Mano tikslas - užtikrinti puikią klientų patirtį.');
                   }}
                   className="flex-1 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-xs font-medium"
                 >
