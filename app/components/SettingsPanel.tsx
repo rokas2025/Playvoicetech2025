@@ -388,9 +388,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 onChange={(e) => setLlmModel(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white text-sm"
               >
-                <option value="gpt-4o-mini">GPT-4o Mini (greičiausias)</option>
-                <option value="o1-mini">o1-mini (protingesnis)</option>
-                <option value="o3-mini-nano">o3-mini-nano (mažiausias)</option>
+                <option value="gpt-4o-mini">GPT-4o Mini (greičiausias, rekomenduojamas)</option>
+                <option value="gpt-4o">GPT-4o (protingesnis, lėtesnis)</option>
+                <option value="gpt-3.5-turbo">GPT-3.5 Turbo (seniausias, pigiausias)</option>
               </select>
             </div>
 

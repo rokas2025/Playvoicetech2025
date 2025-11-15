@@ -218,6 +218,13 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           })),
           model: agent?.llm_model || 'gpt-4o-mini',
           system_prompt: agent?.system_prompt,
+          agent_knowledge: {
+            agent_name: agent?.agent_name,
+            agent_role: agent?.agent_role,
+            agent_task: agent?.agent_task,
+            agent_location: agent?.agent_location,
+            agent_info: agent?.agent_info,
+          },
         }),
       });
 
@@ -410,6 +417,13 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           })),
           model: agent?.llm_model || 'gpt-4o-mini',
           system_prompt: agent?.system_prompt,
+          agent_knowledge: {
+            agent_name: agent?.agent_name,
+            agent_role: agent?.agent_role,
+            agent_task: agent?.agent_task,
+            agent_location: agent?.agent_location,
+            agent_info: agent?.agent_info,
+          },
         }),
       });
 

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { messages, system_prompt, model } = body;
+    const { messages, system_prompt, model, agent_knowledge } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -24,15 +24,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Default Lithuanian system prompt
-    const defaultSystemPrompt = `Tu esi naudingas AI asistentas, kuris visada atsako lietuvių kalba. 
+    // Build system prompt with agent knowledge
+    let finalSystemPrompt = system_prompt;
+    
+    if (agent_knowledge) {
+      const { agent_name, agent_role, agent_task, agent_location, agent_info } = agent_knowledge;
+      
+      // Inject agent knowledge into system prompt
+      const knowledgeContext = `
+APIE TAVE:
+- Vardas: ${agent_name || 'AI Asistentas'}
+- Profesija/Rolė: ${agent_role || 'Virtualus asistentas'}
+- Užduotis: ${agent_task || 'Padėti vartotojams'}
+- Vieta: ${agent_location || 'Lietuva'}
+${agent_info ? `- Papildoma informacija: ${agent_info}` : ''}
+
+INSTRUKCIJOS:
+${system_prompt || 'Tu esi naudingas AI asistentas, kuris visada atsako lietuvių kalba. Būk mandagus, aiškus ir informatyvus.'}
+
+SVARBU:
+- Visada atsakyk lietuvių kalba
+- Naudok savo žinias apie save (vardą, rolę, užduotį) atsakydamas
+- Būk mandagus, profesionalus ir naudingas
+- Atsakyk trumpai ir konkrečiai, nebent prašoma plačiau paaiškinti
+`.trim();
+      
+      finalSystemPrompt = knowledgeContext;
+    } else if (!system_prompt) {
+      // Default Lithuanian system prompt if no knowledge provided
+      finalSystemPrompt = `Tu esi naudingas AI asistentas, kuris visada atsako lietuvių kalba. 
 Būk mandagus, aiškus ir informatyvus. Atsakyk trumpai ir konkrečiai, nebent prašoma plačiau paaiškinti.`;
+    }
 
     // Build messages array for OpenAI
     const openaiMessages = [
       {
         role: 'system' as const,
-        content: system_prompt || defaultSystemPrompt,
+        content: finalSystemPrompt,
       },
       ...messages.map((msg: any) => ({
         role: msg.role as 'user' | 'assistant',
