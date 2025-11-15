@@ -303,7 +303,24 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
         {/* Voice Settings */}
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900">Balso nustatymai</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900">Balso nustatymai</h3>
+            <button
+              onClick={() => {
+                setVoiceSettings({
+                  stability: 0.5,
+                  similarity_boost: 0.8,
+                  style: 0.0,
+                  speed: 1.0,
+                  use_speaker_boost: true,
+                  optimize_streaming_latency: 3,
+                });
+              }}
+              className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            >
+              ↻ Atstatyti į numatytuosius
+            </button>
+          </div>
 
           {/* Stability */}
           <div>
