@@ -21,27 +21,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Default voice settings for v3
+    // Voice settings for eleven_v3 model (as per rules)
     const settings = {
       stability: voice_settings?.stability ?? 0.5,
       similarity_boost: voice_settings?.similarity_boost ?? 0.8,
       style: voice_settings?.style ?? 0.0,
+      speed: voice_settings?.speed ?? 1.0,
       use_speaker_boost: voice_settings?.use_speaker_boost ?? true,
     };
 
-    // Call ElevenLabs TTS API with v3 model
+    // Call ElevenLabs TTS API with eleven_v3 model (as per rules)
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voice_id}/stream?output_format=mp3_44100_128`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voice_id}/stream?output_format=pcm_16000`,
       {
         method: 'POST',
         headers: {
           'xi-api-key': apiKey,
           'Content-Type': 'application/json',
-          'Accept': 'audio/mpeg',
+          'Accept': 'audio/pcm',
         },
         body: JSON.stringify({
           text,
-          model_id: 'eleven_turbo_v2_5', // Using turbo v2.5 which supports Lithuanian better
+          model_id: 'eleven_v3', // Required: eleven_v3 model as per rules
           voice_settings: settings,
           optimize_streaming_latency: 3, // Aggressive streaming for low latency
         }),
@@ -57,13 +58,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Stream the audio back to the client
+    // Stream the PCM audio back to the client
     const audioBuffer = await response.arrayBuffer();
 
     return new NextResponse(audioBuffer, {
       status: 200,
       headers: {
-        'Content-Type': 'audio/mpeg',
+        'Content-Type': 'audio/pcm',
         'Content-Length': audioBuffer.byteLength.toString(),
       },
     });

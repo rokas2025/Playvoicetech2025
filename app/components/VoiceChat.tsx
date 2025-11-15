@@ -18,16 +18,65 @@ export function VoiceChat() {
   const [error, setError] = useState<string | null>(null);
   const [textInput, setTextInput] = useState('');
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
+  const [sessionId, setSessionId] = useState<string | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Initialize session on mount
+  useEffect(() => {
+    initializeSession();
+  }, []);
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const initializeSession = async () => {
+    try {
+      const response = await fetch('/api/sessions');
+      if (response.ok) {
+        const data = await response.json();
+        setSessionId(data.session.id);
+        
+        // Load existing messages
+        const messagesRes = await fetch(`/api/sessions/${data.session.id}/messages`);
+        if (messagesRes.ok) {
+          const messagesData = await messagesRes.json();
+          const loadedMessages: Message[] = messagesData.messages.map((msg: any) => ({
+            id: msg.id,
+            role: msg.role,
+            text: msg.text,
+            timestamp: new Date(msg.created_at),
+          }));
+          setMessages(loadedMessages);
+        }
+      }
+    } catch (err) {
+      console.error('Error initializing session:', err);
+    }
+  };
+
+  const saveMessage = async (role: 'user' | 'assistant', text: string, voiceId?: string | null) => {
+    if (!sessionId) return;
+
+    try {
+      await fetch(`/api/sessions/${sessionId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role,
+          text,
+          tts_voice_id: voiceId,
+        }),
+      });
+    } catch (err) {
+      console.error('Error saving message:', err);
+    }
+  };
 
   const getStatusText = () => {
     switch (status) {
@@ -135,6 +184,9 @@ export function VoiceChat() {
           timestamp: new Date(),
         };
         setMessages(prev => [...prev, userMessage]);
+        
+        // Save to database
+        await saveMessage('user', transcribedText);
 
         // Get LLM response
         const llmResponse = await fetch('/api/llm/chat', {
@@ -165,7 +217,10 @@ export function VoiceChat() {
 
         // Play TTS
         setStatus('speaking');
-        await playTTS(reply);
+        const voiceId = await playTTS(reply);
+        
+        // Save to database with voice ID
+        await saveMessage('assistant', reply, voiceId);
         
         setStatus('ready');
       };
@@ -176,33 +231,83 @@ export function VoiceChat() {
     }
   };
 
-  const playTTS = async (text: string) => {
+  const playTTS = async (text: string): Promise<string | null> => {
     try {
+      // Get current voice settings from settings
+      const settingsRes = await fetch('/api/agents/voice-settings?agent_id=00000000-0000-0000-0000-000000000001');
+      let voiceSettings = null;
+      let voiceId = null;
+
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        if (settingsData.preset) {
+          voiceSettings = {
+            stability: settingsData.preset.stability,
+            similarity_boost: settingsData.preset.similarity_boost,
+            style: settingsData.preset.style,
+            speed: settingsData.preset.speed,
+            use_speaker_boost: settingsData.preset.use_speaker_boost,
+          };
+          voiceId = settingsData.preset.eleven_voice_id;
+        }
+      }
+
+      // Get default voice from agent if not in preset
+      if (!voiceId) {
+        const agentsRes = await fetch('/api/agents');
+        if (agentsRes.ok) {
+          const agentsData = await agentsRes.json();
+          if (agentsData.agents && agentsData.agents.length > 0) {
+            voiceId = agentsData.agents[0].default_voice_id;
+          }
+        }
+      }
+
+      if (!voiceId) {
+        throw new Error('No voice selected. Please select a voice in settings.');
+      }
+
       const response = await fetch('/api/eleven/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ 
+          text,
+          voice_id: voiceId,
+          voice_settings: voiceSettings,
+        }),
       });
 
       if (!response.ok) {
         throw new Error('TTS failed');
       }
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      // Handle PCM audio playback using Web Audio API
+      const audioBuffer = await response.arrayBuffer();
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      
+      // Convert PCM to AudioBuffer
+      const audioBufferData = audioContext.createBuffer(1, audioBuffer.byteLength / 2, 16000);
+      const channelData = audioBufferData.getChannelData(0);
+      const view = new Int16Array(audioBuffer);
+      
+      for (let i = 0; i < view.length; i++) {
+        channelData[i] = view[i] / 32768.0; // Convert to float32
+      }
 
-      return new Promise<void>((resolve, reject) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          resolve();
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBufferData;
+      source.connect(audioContext.destination);
+
+      return new Promise<string | null>((resolve, reject) => {
+        source.onended = () => {
+          audioContext.close();
+          resolve(voiceId);
         };
-        audio.onerror = reject;
-        audio.play();
+        source.start(0);
       });
     } catch (err) {
       console.error('Error playing TTS:', err);
-      throw err;
+      return null;
     }
   };
 
@@ -236,6 +341,9 @@ export function VoiceChat() {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, userMessage]);
+      
+      // Save to database
+      await saveMessage('user', userText);
 
       // Get LLM response
       const llmResponse = await fetch('/api/llm/chat', {
@@ -266,7 +374,10 @@ export function VoiceChat() {
 
       // Play TTS
       setStatus('speaking');
-      await playTTS(reply);
+      const voiceId = await playTTS(reply);
+      
+      // Save to database with voice ID
+      await saveMessage('assistant', reply, voiceId);
       
       setStatus('ready');
     } catch (err) {

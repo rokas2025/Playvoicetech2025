@@ -11,8 +11,8 @@ export async function GET() {
       );
     }
 
-    // Call ElevenLabs API to get voices
-    const response = await fetch('https://api.elevenlabs.io/v1/voices', {
+    // Call ElevenLabs API to get voices (v2 endpoint as per rules)
+    const response = await fetch('https://api.elevenlabs.io/v2/voices', {
       method: 'GET',
       headers: {
         'xi-api-key': apiKey,
