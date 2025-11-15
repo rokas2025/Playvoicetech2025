@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
       style,
       speed,
       use_speaker_boost,
+      optimize_streaming_latency,
+      tts_streaming_enabled,
     } = body;
 
     if (!agent_id || !voice_id) {
@@ -42,6 +44,8 @@ export async function POST(request: NextRequest) {
           style: style ?? 0.0,
           speed: speed ?? 1.0,
           use_speaker_boost: use_speaker_boost ?? true,
+          optimize_streaming_latency: optimize_streaming_latency ?? null,
+          tts_streaming_enabled: tts_streaming_enabled ?? false,
           is_default: true,
         })
         .eq('id', existing.id)
@@ -63,6 +67,8 @@ export async function POST(request: NextRequest) {
           style: style ?? 0.0,
           speed: speed ?? 1.0,
           use_speaker_boost: use_speaker_boost ?? true,
+          optimize_streaming_latency: optimize_streaming_latency ?? null,
+          tts_streaming_enabled: tts_streaming_enabled ?? false,
           is_default: true,
         })
         .select()
