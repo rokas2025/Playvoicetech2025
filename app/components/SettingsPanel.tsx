@@ -20,10 +20,9 @@ type SettingsPanelProps = {
   onClose?: () => void;
 };
 
-const DEFAULT_AGENT_ID = '00000000-0000-0000-0000-000000000001'; // We'll use a fixed agent ID
-
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [voices, setVoices] = useState<Voice[]>([]);
+  const [agentId, setAgentId] = useState<string>('');
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState<string>('');
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
@@ -60,23 +59,24 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         const agentsData = await agentsRes.json();
         if (agentsData.agents && agentsData.agents.length > 0) {
           const agent = agentsData.agents[0];
+          setAgentId(agent.id); // Store the actual agent ID
           setSystemPrompt(agent.system_prompt || '');
           setSelectedVoiceId(agent.default_voice_id || '');
-        }
-      }
-
-      // Load voice settings
-      const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${DEFAULT_AGENT_ID}`);
-      if (settingsRes.ok) {
-        const settingsData = await settingsRes.json();
-        if (settingsData.preset) {
-          setVoiceSettings({
-            stability: settingsData.preset.stability,
-            similarity_boost: settingsData.preset.similarity_boost,
-            style: settingsData.preset.style,
-            speed: settingsData.preset.speed,
-            use_speaker_boost: settingsData.preset.use_speaker_boost,
-          });
+          
+          // Load voice settings for this agent
+          const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
+          if (settingsRes.ok) {
+            const settingsData = await settingsRes.json();
+            if (settingsData.preset) {
+              setVoiceSettings({
+                stability: settingsData.preset.stability,
+                similarity_boost: settingsData.preset.similarity_boost,
+                style: settingsData.preset.style,
+                speed: settingsData.preset.speed,
+                use_speaker_boost: settingsData.preset.use_speaker_boost,
+              });
+            }
+          }
         }
       }
     } catch (err) {
@@ -97,12 +97,17 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         return;
       }
 
+      if (!agentId) {
+        setMessage({ type: 'error', text: 'Agentas nerastas. Perkraukite puslapį.' });
+        return;
+      }
+
       // Update agent settings
       const agentRes = await fetch('/api/agents', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: DEFAULT_AGENT_ID,
+          id: agentId,
           system_prompt: systemPrompt,
           default_voice_id: selectedVoiceId,
         }),
@@ -117,7 +122,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agent_id: DEFAULT_AGENT_ID,
+          agent_id: agentId,
           voice_id: selectedVoiceId,
           ...voiceSettings,
         }),

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-const DEFAULT_AGENT_ID = '00000000-0000-0000-0000-000000000001';
-
 // GET - Get or create current session
 export async function GET(request: NextRequest) {
   try {
@@ -23,11 +21,27 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ session: data });
     } else {
+      // Get the first agent
+      const { data: agents } = await supabase
+        .from('agents')
+        .select('id')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!agents || agents.length === 0) {
+        return NextResponse.json(
+          { error: 'No agent found. Please create an agent first.' },
+          { status: 404 }
+        );
+      }
+
+      const agentId = agents[0].id;
+
       // Get latest active session or create new one
       const { data: existingSessions, error: fetchError } = await supabase
         .from('sessions')
         .select('*')
-        .eq('agent_id', DEFAULT_AGENT_ID)
+        .eq('agent_id', agentId)
         .is('ended_at', null)
         .order('started_at', { ascending: false })
         .limit(1);
@@ -42,7 +56,7 @@ export async function GET(request: NextRequest) {
       const { data: newSession, error: createError } = await supabase
         .from('sessions')
         .insert({
-          agent_id: DEFAULT_AGENT_ID,
+          agent_id: agentId,
           meta: { browser: 'web' },
         })
         .select()
@@ -67,10 +81,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { agent_id, meta } = body;
 
+    // If no agent_id provided, get the first agent
+    let finalAgentId = agent_id;
+    if (!finalAgentId) {
+      const { data: agents } = await supabase
+        .from('agents')
+        .select('id')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!agents || agents.length === 0) {
+        return NextResponse.json(
+          { error: 'No agent found' },
+          { status: 404 }
+        );
+      }
+      finalAgentId = agents[0].id;
+    }
+
     const { data, error } = await supabase
       .from('sessions')
       .insert({
-        agent_id: agent_id || DEFAULT_AGENT_ID,
+        agent_id: finalAgentId,
         meta: meta || {},
       })
       .select()

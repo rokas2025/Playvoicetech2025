@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// GET - Fetch all agents
+// GET - Fetch all agents (create default if none exist)
 export async function GET() {
   try {
     const { data: agents, error } = await supabase
@@ -15,6 +15,30 @@ export async function GET() {
         { error: 'Failed to fetch agents' },
         { status: 500 }
       );
+    }
+
+    // If no agents exist, create default one
+    if (!agents || agents.length === 0) {
+      const { data: newAgent, error: createError } = await supabase
+        .from('agents')
+        .insert({
+          name: 'Pagrindinis asistentas',
+          description: 'Lietuviškai kalbantis balso asistentas',
+          system_prompt: 'Tu esi naudingas balso asistentas. Visada atsakyk lietuvių kalba. Būk mandagus, aiškus ir glaustus.',
+          model_id: 'eleven_v3'
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating default agent:', createError);
+        return NextResponse.json(
+          { error: 'Failed to create default agent' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ agents: [newAgent] });
     }
 
     return NextResponse.json({ agents: agents || [] });

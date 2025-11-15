@@ -233,32 +233,35 @@ export function VoiceChat() {
 
   const playTTS = async (text: string): Promise<string | null> => {
     try {
-      // Get current voice settings from settings
-      const settingsRes = await fetch('/api/agents/voice-settings?agent_id=00000000-0000-0000-0000-000000000001');
+      // Get agent first
+      const agentsRes = await fetch('/api/agents');
       let voiceSettings = null;
       let voiceId = null;
+      let agentId = null;
 
-      if (settingsRes.ok) {
-        const settingsData = await settingsRes.json();
-        if (settingsData.preset) {
-          voiceSettings = {
-            stability: settingsData.preset.stability,
-            similarity_boost: settingsData.preset.similarity_boost,
-            style: settingsData.preset.style,
-            speed: settingsData.preset.speed,
-            use_speaker_boost: settingsData.preset.use_speaker_boost,
-          };
-          voiceId = settingsData.preset.eleven_voice_id;
+      if (agentsRes.ok) {
+        const agentsData = await agentsRes.json();
+        if (agentsData.agents && agentsData.agents.length > 0) {
+          const agent = agentsData.agents[0];
+          agentId = agent.id;
+          voiceId = agent.default_voice_id;
         }
       }
 
-      // Get default voice from agent if not in preset
-      if (!voiceId) {
-        const agentsRes = await fetch('/api/agents');
-        if (agentsRes.ok) {
-          const agentsData = await agentsRes.json();
-          if (agentsData.agents && agentsData.agents.length > 0) {
-            voiceId = agentsData.agents[0].default_voice_id;
+      // Get voice settings if agent exists
+      if (agentId) {
+        const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agentId}`);
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          if (settingsData.preset) {
+            voiceSettings = {
+              stability: settingsData.preset.stability,
+              similarity_boost: settingsData.preset.similarity_boost,
+              style: settingsData.preset.style,
+              speed: settingsData.preset.speed,
+              use_speaker_boost: settingsData.preset.use_speaker_boost,
+            };
+            voiceId = settingsData.preset.eleven_voice_id;
           }
         }
       }
