@@ -92,27 +92,27 @@ export function useRealtimeSttClient(options: RealtimeSttClientOptions): Realtim
 
       isActiveRef.current = true;
 
-      // Step 1: Get API key from server
-      console.log('[Realtime STT] Fetching API key...');
+      // Step 1: Get single-use token from server
+      console.log('[Realtime STT] Fetching single-use token...');
       const tokenResponse = await fetch('/api/eleven/stt-token');
       
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.json();
-        throw new Error(errorData.error || 'Failed to get API key');
+        throw new Error(errorData.error || 'Failed to get token');
       }
 
-      const { apiKey } = await tokenResponse.json();
-      console.log('[Realtime STT] Got API key');
+      const { token } = await tokenResponse.json();
+      console.log('[Realtime STT] Got single-use token');
 
       // Step 2: Open WebSocket to ElevenLabs EU Residency
-      // Using EU Residency endpoint for compliance
+      // Using single-use token for secure authentication (expires in ~15 min)
       const wsUrl = new URL('wss://api.eu.residency.elevenlabs.io/v1/speech-to-text/realtime');
       wsUrl.searchParams.set('model_id', 'scribe_v2'); // Best model for Lithuanian
       wsUrl.searchParams.set('language_code', 'lt'); // Lithuanian
       wsUrl.searchParams.set('commit_strategy', 'vad'); // Voice Activity Detection
-      wsUrl.searchParams.set('xi-api-key', apiKey); // API key in query params
+      wsUrl.searchParams.set('token', token); // Single-use token (NOT xi-api-key)
 
-      console.log('[Realtime STT] Connecting to WebSocket...');
+      console.log('[Realtime STT] Connecting to WebSocket with token...');
       const ws = new WebSocket(wsUrl.toString());
       wsRef.current = ws;
 

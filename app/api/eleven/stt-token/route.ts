@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Return API key for ElevenLabs realtime STT WebSocket connection
+ * Generate single-use token for ElevenLabs realtime STT WebSocket connection
  * 
  * This endpoint:
  * - Runs server-side only
- * - Returns the ELEVENLABS_API_KEY for WebSocket authentication
- * - API key is passed via query params (WebSocket doesn't support custom headers)
+ * - Requests a single-use token from ElevenLabs (expires in ~15 minutes)
+ * - Returns the temporary token for WebSocket authentication
  * 
- * Security: API key is returned from server-side only, never exposed in client code
+ * Security: API key stays on server, only temporary token is sent to client
+ * Reference: https://elevenlabs.io/docs/api-reference/single-use-token
  */
 export async function GET(request: NextRequest) {
   try {
@@ -22,12 +23,32 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('[STT Token] Returning API key for WebSocket connection');
+    console.log('[STT Token] Requesting single-use token from ElevenLabs EU Residency...');
 
-    // Return the API key for WebSocket authentication
-    // WebSocket doesn't support custom headers, so it must be passed via query params
+    // Request a single-use token from ElevenLabs EU Residency
+    // Token is valid for ~15 minutes and single-use only
+    const response = await fetch(
+      'https://api.eu.residency.elevenlabs.io/v1/single-use-token/realtime_scribe',
+      {
+        method: 'POST',
+        headers: {
+          'xi-api-key': apiKey,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('[STT Token] ElevenLabs API error:', errorData);
+      throw new Error(`Token API error: ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    console.log('[STT Token] Single-use token obtained successfully');
+
+    // Return the temporary token (expires in ~15 minutes)
     return NextResponse.json({ 
-      apiKey: apiKey
+      token: data.token 
     });
 
   } catch (error) {
