@@ -92,33 +92,33 @@ export function useRealtimeSttClient(options: RealtimeSttClientOptions): Realtim
 
       isActiveRef.current = true;
 
-      // Step 1: Get ephemeral token from server
-      console.log('[Realtime STT] Fetching ephemeral token...');
+      // Step 1: Get API key from server
+      console.log('[Realtime STT] Fetching API key...');
       const tokenResponse = await fetch('/api/eleven/stt-token');
       
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.json();
-        throw new Error(errorData.error || 'Failed to get STT token');
+        throw new Error(errorData.error || 'Failed to get API key');
       }
 
-      const { token } = await tokenResponse.json();
-      console.log('[Realtime STT] Got ephemeral token');
+      const { apiKey } = await tokenResponse.json();
+      console.log('[Realtime STT] Got API key');
 
-      // Step 2: Open WebSocket to ElevenLabs
-      // Based on ElevenLabs docs: wss://api.elevenlabs.io/v1/speech-to-text/realtime
-      const wsUrl = new URL('wss://api.elevenlabs.io/v1/speech-to-text/realtime');
+      // Step 2: Open WebSocket to ElevenLabs EU server
+      // Using EU server for better performance: wss://api.eu.elevenlabs.io
+      const wsUrl = new URL('wss://api.eu.elevenlabs.io/v1/speech-to-text/realtime');
       wsUrl.searchParams.set('model_id', 'scribe_v2'); // Best model for Lithuanian
       wsUrl.searchParams.set('language_code', 'lt'); // Lithuanian
       wsUrl.searchParams.set('commit_strategy', 'vad'); // Voice Activity Detection
-      wsUrl.searchParams.set('token', token); // Ephemeral token
+      wsUrl.searchParams.set('xi-api-key', apiKey); // API key in query params
 
-      console.log('[Realtime STT] Connecting to WebSocket...');
+      console.log('[Realtime STT] Connecting to EU WebSocket...');
       const ws = new WebSocket(wsUrl.toString());
       wsRef.current = ws;
 
       // WebSocket event handlers
       ws.onopen = () => {
-        console.log('[Realtime STT] WebSocket connected');
+        console.log('[Realtime STT] WebSocket connected to EU server');
       };
 
       ws.onmessage = (event) => {

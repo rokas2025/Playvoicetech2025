@@ -52,10 +52,11 @@ export async function POST(request: NextRequest) {
       requestBody.optimize_streaming_latency = optimizeLatency;
     }
 
-    // Call ElevenLabs TTS API with eleven_v3 model (as per rules - supports 70+ languages including Lithuanian)
+    // Call ElevenLabs TTS API with eleven_v3 model using EU server for better performance
+    // (as per rules - supports 70+ languages including Lithuanian)
     // Reference: https://elevenlabs.io/docs/models#eleven-v3-alpha
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voice_id}/stream?output_format=pcm_16000`,
+      `https://api.eu.elevenlabs.io/v1/text-to-speech/${voice_id}/stream?output_format=pcm_16000`,
       {
         method: 'POST',
         headers: {

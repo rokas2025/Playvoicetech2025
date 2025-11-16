@@ -40,8 +40,9 @@ export async function POST(request: NextRequest) {
 
     console.log('Calling ElevenLabs STT API...');
 
-    // Call ElevenLabs STT API (as per docs: https://elevenlabs.io/docs/api-reference/speech-to-text/convert)
-    const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+    // Call ElevenLabs STT API using EU server for better performance
+    // (as per docs: https://elevenlabs.io/docs/api-reference/speech-to-text/convert)
+    const response = await fetch('https://api.eu.elevenlabs.io/v1/speech-to-text', {
       method: 'POST',
       headers: {
         'xi-api-key': apiKey,
