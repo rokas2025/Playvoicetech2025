@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { TimingLog } from './Statistics';
-import { useRealtimeSttClient } from '../hooks/useRealtimeSttClient';
+import { useRealtimeScribe } from '../hooks/useRealtimeScribe';
 
 type Message = {
   id: string;
@@ -46,8 +46,8 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     currentTtsModeRef.current = currentTtsMode;
   }, [currentTtsMode]);
 
-  // Initialize realtime STT client
-  const realtimeSttClient = useRealtimeSttClient({
+  // Initialize realtime STT using ElevenLabs React SDK
+  const realtimeScribe = useRealtimeScribe({
     onPartialTranscript: (text) => {
       setPartialTranscript(text);
     },
@@ -62,6 +62,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       setIsSessionActive(false);
       setStatus('ready');
     },
+    languageCode: 'lt', // Lithuanian
   });
 
   // Initialize session and load TTS mode on mount
@@ -185,8 +186,8 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       setIsSessionActive(true);
       setStatus('listening');
 
-      // Start realtime STT
-      await realtimeSttClient.start();
+      // Start realtime STT using ElevenLabs SDK
+      await realtimeScribe.start();
       console.log('[VoiceChat] Conversation started');
     } catch (err) {
       console.error('[VoiceChat] Error starting conversation:', err);
@@ -200,7 +201,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
   const stopConversation = () => {
     console.log('[VoiceChat] Stopping conversation...');
     setIsSessionActive(false);
-    realtimeSttClient.stop();
+    realtimeScribe.stop();
     setPartialTranscript('');
     setStatus('ready');
     console.log('[VoiceChat] Conversation stopped');
@@ -299,7 +300,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       setStatus('speaking');
       
       // Stop microphone and WebSocket during speaking
-      realtimeSttClient.stop();
+      realtimeScribe.stop();
 
       // Get voice settings
       let voiceSettings = null;
@@ -362,7 +363,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         console.log('[VoiceChat] Returning to listening...');
         setStatus('listening');
         // Restart microphone and WebSocket
-        await realtimeSttClient.start();
+        await realtimeScribe.start();
       } else {
         setStatus('ready');
       }
@@ -375,7 +376,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         setStatus('listening');
         // Try to restart STT
         try {
-          await realtimeSttClient.start();
+          await realtimeScribe.start();
         } catch (restartErr) {
           console.error('[VoiceChat] Failed to restart STT:', restartErr);
           setIsSessionActive(false);
