@@ -797,7 +797,6 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
 
     try {
       console.log('[TTS V2] 🎵 Starting streaming with proper PCM frame alignment...');
-      console.log('[TTS V2] 📊 Voice settings:', voiceSettings);
       
       let chunkCount = 0;
       let mutedCount = 0;
