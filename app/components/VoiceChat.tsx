@@ -30,10 +30,10 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState<string>('');
   const [vadSettings, setVadSettings] = useState({
-    vadSilenceThresholdSecs: 1.5,
-    vadThreshold: 0.4,
-    minSpeechDurationMs: 100,
-    minSilenceDurationMs: 100,
+    vadSilenceThresholdSecs: 2.0,  // Wait 2 seconds of silence before commit
+    vadThreshold: 0.5,              // Less sensitive = fewer false triggers
+    minSpeechDurationMs: 200,       // Ignore very short sounds
+    minSilenceDurationMs: 200,      // Ignore brief pauses in speech
   });
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -191,17 +191,23 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         return;
       }
 
-      // Load VAD settings from agent
+      // Load VAD settings from agent (with optimized defaults)
       const agentRes = await fetch('/api/agents');
       if (agentRes.ok) {
         const agentData = await agentRes.json();
         const agent = agentData.agents?.[0];
         if (agent) {
           setVadSettings({
-            vadSilenceThresholdSecs: agent.vad_silence_threshold_secs ?? 1.5,
-            vadThreshold: agent.vad_threshold ?? 0.4,
-            minSpeechDurationMs: agent.min_speech_duration_ms ?? 100,
-            minSilenceDurationMs: agent.min_silence_duration_ms ?? 100,
+            vadSilenceThresholdSecs: agent.vad_silence_threshold_secs ?? 2.0,
+            vadThreshold: agent.vad_threshold ?? 0.5,
+            minSpeechDurationMs: agent.min_speech_duration_ms ?? 200,
+            minSilenceDurationMs: agent.min_silence_duration_ms ?? 200,
+          });
+          console.log('[VoiceChat] 🎛️ VAD settings loaded:', {
+            silence: agent.vad_silence_threshold_secs ?? 2.0,
+            threshold: agent.vad_threshold ?? 0.5,
+            minSpeech: agent.min_speech_duration_ms ?? 200,
+            minSilence: agent.min_silence_duration_ms ?? 200,
           });
         }
       }
@@ -790,7 +796,8 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     };
 
     try {
-      console.log('[TTS V2] Starting streaming with proper PCM frame alignment...');
+      console.log('[TTS V2] 🎵 Starting streaming with proper PCM frame alignment...');
+      console.log('[TTS V2] 📊 Voice settings:', voiceSettings);
       
       let chunkCount = 0;
       let mutedCount = 0;
@@ -800,7 +807,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         const { done, value } = await reader.read();
         
         if (done) {
-          console.log(`[TTS V2] Stream complete - Played: ${chunkCount}, Muted: ${mutedCount}, Skipped: ${skippedCount}`);
+          console.log(`[TTS V2] ✅ Stream complete - Played: ${chunkCount}, Muted: ${mutedCount}, Skipped: ${skippedCount}`);
           break;
         }
 
@@ -858,15 +865,9 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           channelData[i] = int16Array[i] / 32768.0;
         }
 
-        // 🎯 STEP 5: Detect and mute suspicious spikes (broken PCM safety net)
-        if (hasSuspiciousSpike(channelData)) {
-          console.warn(`[TTS V2] Muting chunk ${chunkCount + 1} - suspicious spike detected (broken PCM?)`);
-          channelData.fill(0); // Convert to silence
-          mutedCount++;
-        } else {
-          // Apply fade in to prevent clicks (only if not muted)
-          applyFadeIn(channelData);
-        }
+        // 🎯 STEP 5: Apply fade in to prevent clicks
+        // Note: Spike detection disabled - ElevenLabs audio is clean and natural speech has volume jumps
+        applyFadeIn(channelData);
 
         // 🎯 STEP 6: Schedule chunk for playback with cross-fade overlap
         const now = audioContext.currentTime;

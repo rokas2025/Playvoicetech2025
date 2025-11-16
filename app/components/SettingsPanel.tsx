@@ -45,11 +45,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [agentInfo, setAgentInfo] = useState<string>('Esu draugiškas AI asistentas, kuris kalba lietuviškai.');
   const [llmModel, setLlmModel] = useState<string>('gpt-4.1-mini');
   
-  // VAD settings for conversational mode
-  const [vadSilenceThresholdSecs, setVadSilenceThresholdSecs] = useState<number>(1.5);
-  const [vadThreshold, setVadThreshold] = useState<number>(0.4);
-  const [minSpeechDurationMs, setMinSpeechDurationMs] = useState<number>(100);
-  const [minSilenceDurationMs, setMinSilenceDurationMs] = useState<number>(100);
+  // VAD settings for conversational mode (optimized defaults)
+  const [vadSilenceThresholdSecs, setVadSilenceThresholdSecs] = useState<number>(2.0);
+  const [vadThreshold, setVadThreshold] = useState<number>(0.5);
+  const [minSpeechDurationMs, setMinSpeechDurationMs] = useState<number>(200);
+  const [minSilenceDurationMs, setMinSilenceDurationMs] = useState<number>(200);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,11 +91,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           setAgentInfo(agent.agent_info || 'Esu draugiškas AI asistentas, kuris kalba lietuviškai.');
           setLlmModel(agent.llm_model || 'gpt-4.1-mini');
           
-          // Load VAD settings
-          setVadSilenceThresholdSecs(agent.vad_silence_threshold_secs ?? 1.5);
-          setVadThreshold(agent.vad_threshold ?? 0.4);
-          setMinSpeechDurationMs(agent.min_speech_duration_ms ?? 100);
-          setMinSilenceDurationMs(agent.min_silence_duration_ms ?? 100);
+          // Load VAD settings (with optimized defaults)
+          setVadSilenceThresholdSecs(agent.vad_silence_threshold_secs ?? 2.0);
+          setVadThreshold(agent.vad_threshold ?? 0.5);
+          setMinSpeechDurationMs(agent.min_speech_duration_ms ?? 200);
+          setMinSilenceDurationMs(agent.min_silence_duration_ms ?? 200);
           
           // Load voice settings for this agent
           const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
@@ -842,10 +842,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               <button
                 type="button"
                 onClick={() => {
-                  setVadSilenceThresholdSecs(1.5);
-                  setVadThreshold(0.4);
-                  setMinSpeechDurationMs(100);
-                  setMinSilenceDurationMs(100);
+                  setVadSilenceThresholdSecs(2.0);
+                  setVadThreshold(0.5);
+                  setMinSpeechDurationMs(200);
+                  setMinSilenceDurationMs(200);
                 }}
                 className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
               >

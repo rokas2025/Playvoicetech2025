@@ -79,12 +79,13 @@ export function useRealtimeScribe(options: RealtimeScribeOptions = {}) {
     },
     
     onPartialTranscript: (data) => {
-      console.log('[Realtime Scribe] Partial:', data.text);
+      console.log('[Realtime Scribe] 📝 Partial:', data.text, '| Full data:', data);
       onPartialTranscript?.(data.text);
     },
     
     onCommittedTranscript: (data) => {
-      console.log('[Realtime Scribe] Committed:', data.text);
+      console.log('[Realtime Scribe] ✅ Committed:', data.text, '| Full data:', data);
+      console.log('[Realtime Scribe] 📊 Commit details - Length:', data.text?.length, 'chars, Trimmed:', data.text?.trim().length);
       onCommittedTranscript?.(data.text);
     },
     
