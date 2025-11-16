@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { TimingLog } from './Statistics';
+import { useRealtimeSttClient } from '../hooks/useRealtimeSttClient';
 
 type Message = {
   id: string;
@@ -11,6 +12,7 @@ type Message = {
 };
 
 type Status = 'ready' | 'listening' | 'thinking' | 'speaking';
+type TtsMode = 'normal' | 'streaming-v1' | 'streaming-v2';
 
 type VoiceChatProps = {
   onTimingLog?: (log: TimingLog) => void;
@@ -24,15 +26,48 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
   const [textInput, setTextInput] = useState('');
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [currentTtsMode, setCurrentTtsMode] = useState<TtsMode>('normal');
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [partialTranscript, setPartialTranscript] = useState<string>('');
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isSessionActiveRef = useRef(false);
+  const currentTtsModeRef = useRef<TtsMode>('normal');
 
-  // Initialize session on mount
+  // Sync refs with state
+  useEffect(() => {
+    isSessionActiveRef.current = isSessionActive;
+  }, [isSessionActive]);
+
+  useEffect(() => {
+    currentTtsModeRef.current = currentTtsMode;
+  }, [currentTtsMode]);
+
+  // Initialize realtime STT client
+  const realtimeSttClient = useRealtimeSttClient({
+    onPartialTranscript: (text) => {
+      setPartialTranscript(text);
+    },
+    onCommittedTranscript: (text) => {
+      if (!isSessionActiveRef.current) return;
+      setPartialTranscript(''); // Clear partial
+      handleTranscriptCommitted(text);
+    },
+    onError: (error) => {
+      console.error('[VoiceChat] Realtime STT error:', error);
+      setError(`Klaida: ${error}`);
+      setIsSessionActive(false);
+      setStatus('ready');
+    },
+  });
+
+  // Initialize session and load TTS mode on mount
   useEffect(() => {
     initializeSession();
+    loadTtsMode();
   }, []);
 
   // Auto-scroll to bottom when new messages arrive
@@ -106,6 +141,249 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
         return 'bg-green-500';
       default:
         return 'bg-gray-400';
+    }
+  };
+
+  // Load current TTS mode from settings
+  const loadTtsMode = async (): Promise<TtsMode> => {
+    try {
+      const agentsRes = await fetch('/api/agents');
+      if (!agentsRes.ok) return 'normal';
+      
+      const agentsData = await agentsRes.json();
+      const agent = agentsData.agents?.[0];
+      if (!agent) return 'normal';
+
+      const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
+      if (!settingsRes.ok) return 'normal';
+
+      const settingsData = await settingsRes.json();
+      const mode = settingsData.preset?.tts_streaming_mode || 'normal';
+      
+      setCurrentTtsMode(mode);
+      return mode;
+    } catch (err) {
+      console.error('[VoiceChat] Error loading TTS mode:', err);
+      return 'normal';
+    }
+  };
+
+  // Start conversational mode (streaming-v2 only)
+  const startConversation = async () => {
+    try {
+      console.log('[VoiceChat] Starting conversation...');
+      setError(null);
+
+      // Load current TTS mode
+      const mode = await loadTtsMode();
+      
+      if (mode !== 'streaming-v2') {
+        setError('Pokalbio režimas veikia tik su Streaming V2. Pakeiskite nustatymuose.');
+        return;
+      }
+
+      setIsSessionActive(true);
+      setStatus('listening');
+
+      // Start realtime STT
+      await realtimeSttClient.start();
+      console.log('[VoiceChat] Conversation started');
+    } catch (err) {
+      console.error('[VoiceChat] Error starting conversation:', err);
+      setError('Nepavyko pradėti pokalbio. Patikrinkite mikrofono leidimus.');
+      setIsSessionActive(false);
+      setStatus('ready');
+    }
+  };
+
+  // Stop conversational mode
+  const stopConversation = () => {
+    console.log('[VoiceChat] Stopping conversation...');
+    setIsSessionActive(false);
+    realtimeSttClient.stop();
+    setPartialTranscript('');
+    setStatus('ready');
+    console.log('[VoiceChat] Conversation stopped');
+  };
+
+  // Handle committed transcript from realtime STT
+  const handleTranscriptCommitted = async (text: string) => {
+    if (!text.trim()) return;
+
+    console.log('[VoiceChat] Committed transcript:', text);
+    
+    const startTime = performance.now();
+    let sttTime: number | null = null;
+    let llmTime: number | null = null;
+    let ttsTime: number | null = null;
+    let assistantText = '';
+
+    try {
+      setStatus('thinking');
+
+      // Add user message
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        text: text,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Save to database
+      await saveMessage('user', text);
+
+      // Get LLM response
+      const llmStart = performance.now();
+      
+      const agentRes = await fetch('/api/agents');
+      const agentData = await agentRes.json();
+      const agent = agentData.agents?.[0];
+      
+      const llmResponse = await fetch('/api/llm/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map(m => ({
+            role: m.role,
+            content: m.text,
+          })),
+          model: agent?.llm_model || 'gpt-4.1-mini',
+          system_prompt: agent?.system_prompt,
+          agent_knowledge: {
+            agent_name: agent?.agent_name,
+            agent_role: agent?.agent_role,
+            agent_task: agent?.agent_task,
+            agent_location: agent?.agent_location,
+            agent_info: agent?.agent_info,
+          },
+        }),
+      });
+
+      if (!llmResponse.ok) {
+        throw new Error('LLM failed');
+      }
+
+      const { reply } = await llmResponse.json();
+      llmTime = (performance.now() - llmStart) / 1000;
+      assistantText = reply;
+
+      // Add assistant message
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        text: reply,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // Play TTS with streaming-v2
+      await playAssistantReplyStreamingV2(reply, agent);
+
+    } catch (err) {
+      console.error('[VoiceChat] Error in conversation loop:', err);
+      setError('Įvyko klaida apdorojant atsakymą.');
+      
+      // Return to listening if session still active
+      if (isSessionActiveRef.current) {
+        setStatus('listening');
+      } else {
+        setStatus('ready');
+      }
+    }
+  };
+
+  // Play assistant reply with streaming-v2 and mic control
+  const playAssistantReplyStreamingV2 = async (replyText: string, agent: any) => {
+    try {
+      setStatus('speaking');
+      
+      // Stop microphone and WebSocket during speaking
+      realtimeSttClient.stop();
+
+      // Get voice settings
+      let voiceSettings = null;
+      let voiceId = null;
+
+      if (agent) {
+        const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          if (settingsData.preset) {
+            voiceSettings = {
+              stability: settingsData.preset.stability,
+              similarity_boost: settingsData.preset.similarity_boost,
+              style: settingsData.preset.style,
+              speed: settingsData.preset.speed,
+              use_speaker_boost: settingsData.preset.use_speaker_boost,
+              optimize_streaming_latency: settingsData.preset.optimize_streaming_latency,
+              tts_streaming_mode: 'streaming-v2', // Force streaming-v2
+            };
+            voiceId = settingsData.preset.eleven_voice_id;
+          }
+        }
+      }
+
+      if (!voiceId) {
+        voiceId = agent?.default_voice_id;
+      }
+
+      if (!voiceId) {
+        throw new Error('No voice selected');
+      }
+
+      // Call TTS API
+      const ttsStart = performance.now();
+      const response = await fetch('/api/eleven/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: replyText,
+          voice_id: voiceId,
+          voice_settings: voiceSettings,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('TTS failed');
+      }
+
+      // Play streaming audio
+      await playStreamingV2(response, voiceId, 'streaming-v2');
+      
+      const ttsTime = (performance.now() - ttsStart) / 1000;
+      console.log('[VoiceChat] TTS completed in', ttsTime.toFixed(2), 's');
+
+      // Save assistant message to database
+      await saveMessage('assistant', replyText, voiceId);
+
+      // After TTS finishes, return to listening if session still active
+      if (isSessionActiveRef.current) {
+        console.log('[VoiceChat] Returning to listening...');
+        setStatus('listening');
+        // Restart microphone and WebSocket
+        await realtimeSttClient.start();
+      } else {
+        setStatus('ready');
+      }
+
+    } catch (err) {
+      console.error('[VoiceChat] Error playing TTS:', err);
+      setError('Klaida grojant atsakymą.');
+      
+      if (isSessionActiveRef.current) {
+        setStatus('listening');
+        // Try to restart STT
+        try {
+          await realtimeSttClient.start();
+        } catch (restartErr) {
+          console.error('[VoiceChat] Failed to restart STT:', restartErr);
+          setIsSessionActive(false);
+          setStatus('ready');
+        }
+      } else {
+        setStatus('ready');
+      }
     }
   };
 
@@ -790,29 +1068,76 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       {/* Voice Input */}
       {inputMode === 'voice' && (
         <>
+          {/* Show partial transcript if in conversational mode */}
+          {isSessionActive && partialTranscript && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <span className="font-semibold">Klausausi: </span>
+                {partialTranscript}
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-center">
-            <button
-              onClick={toggleRecording}
-              disabled={status === 'thinking' || status === 'speaking'}
-              className={`
-                px-8 py-4 rounded-full font-semibold text-lg transition-all
-                ${
-                  isRecording
-                    ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg scale-105'
-                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md'
-                }
-                ${
-                  status === 'thinking' || status === 'speaking'
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'hover:scale-105'
-                }
-              `}
-            >
-              {isRecording ? '⏹ Sustabdyti' : '🎤 Pradėti kalbėti'}
-            </button>
+            {currentTtsMode === 'streaming-v2' ? (
+              // Conversational mode button (streaming-v2 only)
+              <button
+                onClick={isSessionActive ? stopConversation : startConversation}
+                disabled={status === 'thinking' || status === 'speaking'}
+                className={`
+                  px-8 py-4 rounded-full font-semibold text-lg transition-all
+                  ${
+                    isSessionActive
+                      ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg scale-105'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md'
+                  }
+                  ${
+                    status === 'thinking' || status === 'speaking'
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'hover:scale-105'
+                  }
+                `}
+              >
+                {isSessionActive ? '⏹ Baigti pokalbį' : '🎤 Pradėti pokalbį'}
+              </button>
+            ) : (
+              // Push-to-talk mode button (normal, streaming-v1)
+              <button
+                onClick={toggleRecording}
+                disabled={status === 'thinking' || status === 'speaking'}
+                className={`
+                  px-8 py-4 rounded-full font-semibold text-lg transition-all
+                  ${
+                    isRecording
+                      ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg scale-105'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md'
+                  }
+                  ${
+                    status === 'thinking' || status === 'speaking'
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'hover:scale-105'
+                  }
+                `}
+              >
+                {isRecording ? '⏹ Sustabdyti' : '🎤 Pradėti įrašymą'}
+              </button>
+            )}
           </div>
           <div className="mt-4 text-center text-sm text-gray-500">
-            <p>Paspauskite mygtuką, kalbėkite lietuviškai, tada sustabdykite įrašymą</p>
+            {currentTtsMode === 'streaming-v2' ? (
+              <p>
+                💡 <strong>Pokalbio režimas:</strong> Pradėkite pokalbį ir kalbėkite laisvai. 
+                AI automatiškai atpažins, kada baigėte kalbėti (VAD).
+              </p>
+            ) : (
+              <p>
+                Paspauskite mygtuką, kalbėkite lietuviškai, tada sustabdykite įrašymą.
+                <br />
+                <span className="text-xs text-blue-600">
+                  Patarimas: Įjunkite Streaming V2 nustatymuose, kad galėtumėte naudoti pokalbio režimą.
+                </span>
+              </p>
+            )}
           </div>
         </>
       )}
