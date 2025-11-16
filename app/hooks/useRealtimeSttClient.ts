@@ -104,9 +104,9 @@ export function useRealtimeSttClient(options: RealtimeSttClientOptions): Realtim
       const { apiKey } = await tokenResponse.json();
       console.log('[Realtime STT] Got API key');
 
-      // Step 2: Open WebSocket to ElevenLabs
-      // ElevenLabs uses Cloudflare CDN with global edge servers
-      const wsUrl = new URL('wss://api.elevenlabs.io/v1/speech-to-text/realtime');
+      // Step 2: Open WebSocket to ElevenLabs EU Residency
+      // Using EU Residency endpoint for compliance
+      const wsUrl = new URL('wss://api.eu.residency.elevenlabs.io/v1/speech-to-text/realtime');
       wsUrl.searchParams.set('model_id', 'scribe_v2'); // Best model for Lithuanian
       wsUrl.searchParams.set('language_code', 'lt'); // Lithuanian
       wsUrl.searchParams.set('commit_strategy', 'vad'); // Voice Activity Detection

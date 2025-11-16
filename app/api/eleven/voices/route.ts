@@ -14,7 +14,7 @@ export async function GET() {
     // Call ElevenLabs API to get voices using EU server for better performance
     // (v2 endpoint as per rules)
     // Include show_legacy to get ALL voices including custom cloned voices
-    const response = await fetch('https://api.elevenlabs.io/v2/voices?show_legacy=true', {
+    const response = await fetch('https://api.eu.residency.elevenlabs.io/v2/voices?show_legacy=true', {
       method: 'GET',
       headers: {
         'xi-api-key': apiKey,
