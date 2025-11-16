@@ -47,7 +47,7 @@ export function useRealtimeScribe(options: RealtimeScribeOptions = {}) {
   const scribeOptions: ScribeHookOptions = {
     modelId: 'scribe_v2_realtime',
     baseUri: 'wss://api.elevenlabs.io', // Standard server (not EU)
-    commitStrategy: CommitStrategy.AUTOMATIC, // VAD-based automatic commit
+    commitStrategy: CommitStrategy.VAD, // VAD-based automatic commit
     languageCode,
     
     // VAD settings for Lithuanian speech
