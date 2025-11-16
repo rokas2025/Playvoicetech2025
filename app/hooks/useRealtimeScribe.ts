@@ -84,9 +84,43 @@ export function useRealtimeScribe(options: RealtimeScribeOptions = {}) {
     },
     
     onCommittedTranscript: (data) => {
-      console.log('[Realtime Scribe] ✅ Committed:', data.text, '| Full data:', data);
+      console.log('[Realtime Scribe] ✅ Committed (raw):', data.text, '| Full data:', data);
       console.log('[Realtime Scribe] 📊 Commit details - Length:', data.text?.length, 'chars, Trimmed:', data.text?.trim().length);
-      onCommittedTranscript?.(data.text);
+      
+      // 🔧 FIX: De-duplicate text if ElevenLabs sends it twice
+      // This is a known issue with ElevenLabs VAD where committed transcripts
+      // sometimes contain the same text repeated twice
+      let cleanedText = data.text;
+      if (cleanedText && cleanedText.trim().length > 0) {
+        const trimmed = cleanedText.trim();
+        const words = trimmed.split(/\s+/);
+        const halfLength = Math.floor(words.length / 2);
+        
+        // Check if text is duplicated (must have at least 2 words and even word count)
+        if (words.length >= 2 && words.length % 2 === 0) {
+          const firstHalf = words.slice(0, halfLength);
+          const secondHalf = words.slice(halfLength);
+          
+          // Compare word by word, ignoring punctuation differences
+          let isDuplicate = true;
+          for (let i = 0; i < halfLength; i++) {
+            const word1 = firstHalf[i].replace(/[.,!?;:]+$/g, '').toLowerCase();
+            const word2 = secondHalf[i].replace(/[.,!?;:]+$/g, '').toLowerCase();
+            if (word1 !== word2) {
+              isDuplicate = false;
+              break;
+            }
+          }
+          
+          if (isDuplicate) {
+            // Use first half (which typically has better punctuation)
+            cleanedText = firstHalf.join(' ');
+            console.log('[Realtime Scribe] 🔧 Detected duplicate! Cleaned:', cleanedText);
+          }
+        }
+      }
+      
+      onCommittedTranscript?.(cleanedText);
     },
     
     onError: (error) => {
