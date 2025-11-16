@@ -23,12 +23,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('[STT Token] Requesting single-use token from ElevenLabs EU Residency...');
+    console.log('[STT Token] Requesting single-use token from ElevenLabs...');
 
-    // Request a single-use token from ElevenLabs EU Residency
+    // Request a single-use token from ElevenLabs
     // Token is valid for ~15 minutes and single-use only
     const response = await fetch(
-      'https://api.eu.residency.elevenlabs.io/v1/single-use-token/realtime_scribe',
+      'https://api.elevenlabs.io/v1/single-use-token/realtime_scribe',
       {
         method: 'POST',
         headers: {

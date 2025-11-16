@@ -104,13 +104,13 @@ export function useRealtimeSttClient(options: RealtimeSttClientOptions): Realtim
       const { token } = await tokenResponse.json();
       console.log('[Realtime STT] Got single-use token');
 
-      // Step 2: Open WebSocket to ElevenLabs EU Residency
+      // Step 2: Open WebSocket to ElevenLabs
       // Using single-use token for secure authentication (expires in ~15 min)
-      const wsUrl = new URL('wss://api.eu.residency.elevenlabs.io/v1/speech-to-text/realtime');
-      wsUrl.searchParams.set('model_id', 'scribe_v2'); // Best model for Lithuanian
+      // NOTE: Do NOT include model_id - it causes 403 error
+      const wsUrl = new URL('wss://api.elevenlabs.io/v1/speech-to-text/realtime');
       wsUrl.searchParams.set('language_code', 'lt'); // Lithuanian
       wsUrl.searchParams.set('commit_strategy', 'vad'); // Voice Activity Detection
-      wsUrl.searchParams.set('token', token); // Single-use token (NOT xi-api-key)
+      wsUrl.searchParams.set('token', token); // Single-use token
 
       console.log('[Realtime STT] Connecting to WebSocket with token...');
       const ws = new WebSocket(wsUrl.toString());
@@ -125,6 +125,14 @@ export function useRealtimeSttClient(options: RealtimeSttClientOptions): Realtim
         try {
           const message = JSON.parse(event.data);
           
+          // Log all messages for debugging
+          console.log('[Realtime STT] Message:', message.message_type);
+          
+          // Handle session started
+          if (message.message_type === 'session_started') {
+            console.log('[Realtime STT] Session started:', message.session_id);
+          }
+          
           // Handle partial transcripts
           if (message.message_type === 'partial_transcript' && message.text) {
             console.log('[Realtime STT] Partial:', message.text);
@@ -132,9 +140,15 @@ export function useRealtimeSttClient(options: RealtimeSttClientOptions): Realtim
           }
           
           // Handle committed transcripts (VAD detected end of utterance)
-          if (message.message_type === 'transcript' && message.is_committed && message.text) {
-            console.log('[Realtime STT] Committed:', message.text);
+          if (message.message_type === 'transcript' && message.text) {
+            console.log('[Realtime STT] Transcript:', message.text);
             options.onCommittedTranscript?.(message.text);
+          }
+          
+          // Handle errors
+          if (message.message_type === 'error' || message.message_type === 'input_error') {
+            console.error('[Realtime STT] Server error:', message.error);
+            options.onError?.(message.error);
           }
         } catch (err) {
           console.error('[Realtime STT] Error parsing message:', err);
@@ -217,13 +231,8 @@ export function useRealtimeSttClient(options: RealtimeSttClientOptions): Realtim
         const uint8Array = new Uint8Array(int16Array.buffer);
         const base64 = btoa(String.fromCharCode(...uint8Array));
 
-        // Send to ElevenLabs
-        const message = {
-          message_type: 'input_audio_buffer.append',
-          audio_buffer: base64,
-        };
-
-        ws.send(JSON.stringify(message));
+        // Send to ElevenLabs as raw base64 string (NOT JSON)
+        ws.send(base64);
       };
 
       // Connect audio nodes
