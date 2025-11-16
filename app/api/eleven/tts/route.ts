@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     // (as per rules - supports 70+ languages including Lithuanian)
     // Reference: https://elevenlabs.io/docs/models#eleven-v3-alpha
     const response = await fetch(
-      `https://api.eu.elevenlabs.io/v1/text-to-speech/${voice_id}/stream?output_format=pcm_16000`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voice_id}/stream?output_format=pcm_16000`,
       {
         method: 'POST',
         headers: {

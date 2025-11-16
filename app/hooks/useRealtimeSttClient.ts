@@ -104,22 +104,22 @@ export function useRealtimeSttClient(options: RealtimeSttClientOptions): Realtim
       const { apiKey } = await tokenResponse.json();
       console.log('[Realtime STT] Got API key');
 
-      // Step 2: Open WebSocket to ElevenLabs EU server
-      // Using EU server for better performance: wss://api.eu.elevenlabs.io
-      const wsUrl = new URL('wss://api.eu.elevenlabs.io/v1/speech-to-text/realtime');
+      // Step 2: Open WebSocket to ElevenLabs
+      // ElevenLabs uses Cloudflare CDN with global edge servers
+      const wsUrl = new URL('wss://api.elevenlabs.io/v1/speech-to-text/realtime');
       wsUrl.searchParams.set('model_id', 'scribe_v2'); // Best model for Lithuanian
       wsUrl.searchParams.set('language_code', 'lt'); // Lithuanian
       wsUrl.searchParams.set('commit_strategy', 'vad'); // Voice Activity Detection
       wsUrl.searchParams.set('xi-api-key', apiKey); // API key in query params
 
-      console.log('[Realtime STT] Connecting to EU WebSocket...');
+      console.log('[Realtime STT] Connecting to WebSocket...');
       const ws = new WebSocket(wsUrl.toString());
       wsRef.current = ws;
 
       // WebSocket event handlers
-      ws.onopen = () => {
-        console.log('[Realtime STT] WebSocket connected to EU server');
-      };
+              ws.onopen = () => {
+                console.log('[Realtime STT] WebSocket connected');
+              };
 
       ws.onmessage = (event) => {
         try {
