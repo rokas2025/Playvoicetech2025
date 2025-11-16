@@ -31,6 +31,11 @@ type RealtimeScribeOptions = {
   onConnect?: () => void;
   onDisconnect?: () => void;
   languageCode?: string;
+  // VAD settings (can be overridden from database)
+  vadSilenceThresholdSecs?: number;
+  vadThreshold?: number;
+  minSpeechDurationMs?: number;
+  minSilenceDurationMs?: number;
 };
 
 export function useRealtimeScribe(options: RealtimeScribeOptions = {}) {
@@ -41,6 +46,10 @@ export function useRealtimeScribe(options: RealtimeScribeOptions = {}) {
     onConnect,
     onDisconnect,
     languageCode = 'lt', // Lithuanian by default
+    vadSilenceThresholdSecs = 1.5,
+    vadThreshold = 0.4,
+    minSpeechDurationMs = 100,
+    minSilenceDurationMs = 100,
   } = options;
 
   // Configure the ElevenLabs useScribe hook
@@ -50,11 +59,11 @@ export function useRealtimeScribe(options: RealtimeScribeOptions = {}) {
     commitStrategy: CommitStrategy.VAD, // VAD-based automatic commit
     languageCode,
     
-    // VAD settings for Lithuanian speech
-    vadSilenceThresholdSecs: 1.5, // 1.5s of silence triggers commit
-    vadThreshold: 0.4, // Voice detection sensitivity
-    minSpeechDurationMs: 100, // Minimum speech duration
-    minSilenceDurationMs: 100, // Minimum silence duration
+    // VAD settings (from options or defaults)
+    vadSilenceThresholdSecs, // Seconds of silence before commit
+    vadThreshold, // Voice detection sensitivity (0.0-1.0)
+    minSpeechDurationMs, // Minimum speech duration
+    minSilenceDurationMs, // Minimum silence duration
     
     // Microphone settings
     microphone: {

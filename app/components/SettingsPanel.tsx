@@ -45,6 +45,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [agentInfo, setAgentInfo] = useState<string>('Esu draugiškas AI asistentas, kuris kalba lietuviškai.');
   const [llmModel, setLlmModel] = useState<string>('gpt-4.1-mini');
   
+  // VAD settings for conversational mode
+  const [vadSilenceThresholdSecs, setVadSilenceThresholdSecs] = useState<number>(1.5);
+  const [vadThreshold, setVadThreshold] = useState<number>(0.4);
+  const [minSpeechDurationMs, setMinSpeechDurationMs] = useState<number>(100);
+  const [minSilenceDurationMs, setMinSilenceDurationMs] = useState<number>(100);
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -84,6 +90,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           setAgentLocation(agent.agent_location || 'Lietuva');
           setAgentInfo(agent.agent_info || 'Esu draugiškas AI asistentas, kuris kalba lietuviškai.');
           setLlmModel(agent.llm_model || 'gpt-4.1-mini');
+          
+          // Load VAD settings
+          setVadSilenceThresholdSecs(agent.vad_silence_threshold_secs ?? 1.5);
+          setVadThreshold(agent.vad_threshold ?? 0.4);
+          setMinSpeechDurationMs(agent.min_speech_duration_ms ?? 100);
+          setMinSilenceDurationMs(agent.min_silence_duration_ms ?? 100);
           
           // Load voice settings for this agent
           const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
@@ -181,7 +193,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         return;
       }
 
-      // Update agent settings including knowledge fields
+      // Update agent settings including knowledge fields and VAD settings
       const agentRes = await fetch('/api/agents', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -195,6 +207,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           agent_location: agentLocation,
           agent_info: agentInfo,
           llm_model: llmModel,
+          vad_silence_threshold_secs: vadSilenceThresholdSecs,
+          vad_threshold: vadThreshold,
+          min_speech_duration_ms: minSpeechDurationMs,
+          min_silence_duration_ms: minSilenceDurationMs,
         }),
       });
 
@@ -733,6 +749,117 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </p>
             </div>
           </div>
+
+          {/* VAD Settings (for Streaming V2 conversational mode) */}
+          {voiceSettings.tts_streaming_mode === 'streaming-v2' && (
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                🎙️ VAD Nustatymai (Pokalbio režimas)
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Voice Activity Detection nustatymai pokalbio režimui su Streaming V2. 
+                Šie nustatymai kontroliuoja, kaip sistema nustato, kada jūs baigėte kalbėti.
+              </p>
+
+              {/* VAD Silence Threshold */}
+              <div className="mb-4">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Tylos laikas prieš užbaigimą: {vadSilenceThresholdSecs.toFixed(1)}s
+                </label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="3.0"
+                  step="0.1"
+                  value={vadSilenceThresholdSecs}
+                  onChange={(e) => setVadSilenceThresholdSecs(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Kiek sekundžių tylos reikia, kad sistema suprastų, jog baigėte kalbėti. 
+                  Žemesnis = greitesnis atsakymas, bet gali nutraukti per anksti.
+                </p>
+              </div>
+
+              {/* VAD Threshold */}
+              <div className="mb-4">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Balso aptikimo jautrumas: {vadThreshold.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0.0"
+                  max="1.0"
+                  step="0.05"
+                  value={vadThreshold}
+                  onChange={(e) => setVadThreshold(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Kaip jautriai sistema aptinka balsą. Žemesnis = jautresnis (aptiks tylesnį kalbėjimą).
+                </p>
+              </div>
+
+              {/* Min Speech Duration */}
+              <div className="mb-4">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Min. kalbėjimo trukmė: {minSpeechDurationMs}ms
+                </label>
+                <input
+                  type="range"
+                  min="50"
+                  max="500"
+                  step="50"
+                  value={minSpeechDurationMs}
+                  onChange={(e) => setMinSpeechDurationMs(parseInt(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Minimali kalbėjimo trukmė, kad būtų užfiksuota. Apsaugo nuo trumpų triukšmų.
+                </p>
+              </div>
+
+              {/* Min Silence Duration */}
+              <div className="mb-4">
+                <label className="block text-sm text-gray-700 mb-1">
+                  Min. tylos trukmė: {minSilenceDurationMs}ms
+                </label>
+                <input
+                  type="range"
+                  min="50"
+                  max="500"
+                  step="50"
+                  value={minSilenceDurationMs}
+                  onChange={(e) => setMinSilenceDurationMs(parseInt(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Minimali tylos trukmė, kad būtų užfiksuota. Apsaugo nuo trumpų pauzių kalbėjime.
+                </p>
+              </div>
+
+              {/* Reset VAD Settings */}
+              <button
+                type="button"
+                onClick={() => {
+                  setVadSilenceThresholdSecs(1.5);
+                  setVadThreshold(0.4);
+                  setMinSpeechDurationMs(100);
+                  setMinSilenceDurationMs(100);
+                }}
+                className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              >
+                ↻ Atstatyti VAD nustatymus
+              </button>
+
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  💡 <strong>Patarimas:</strong> Jei sistema nutraukia jus per anksti, padidinkite "Tylos laikas". 
+                  Jei nereaguoja į tylesnį kalbėjimą, sumažinkite "Balso aptikimo jautrumas".
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Save Button */}

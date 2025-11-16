@@ -29,6 +29,12 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
   const [currentTtsMode, setCurrentTtsMode] = useState<TtsMode>('normal');
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState<string>('');
+  const [vadSettings, setVadSettings] = useState({
+    vadSilenceThresholdSecs: 1.5,
+    vadThreshold: 0.4,
+    minSpeechDurationMs: 100,
+    minSilenceDurationMs: 100,
+  });
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -63,6 +69,8 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       setStatus('ready');
     },
     languageCode: 'lt', // Lithuanian
+    // VAD settings from state (loaded from agent)
+    ...vadSettings,
   });
 
   // Initialize session and load TTS mode on mount
@@ -181,6 +189,21 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       if (mode !== 'streaming-v2') {
         setError('Pokalbio režimas veikia tik su Streaming V2. Pakeiskite nustatymuose.');
         return;
+      }
+
+      // Load VAD settings from agent
+      const agentRes = await fetch('/api/agents');
+      if (agentRes.ok) {
+        const agentData = await agentRes.json();
+        const agent = agentData.agents?.[0];
+        if (agent) {
+          setVadSettings({
+            vadSilenceThresholdSecs: agent.vad_silence_threshold_secs ?? 1.5,
+            vadThreshold: agent.vad_threshold ?? 0.4,
+            minSpeechDurationMs: agent.min_speech_duration_ms ?? 100,
+            minSilenceDurationMs: agent.min_silence_duration_ms ?? 100,
+          });
+        }
       }
 
       setIsSessionActive(true);

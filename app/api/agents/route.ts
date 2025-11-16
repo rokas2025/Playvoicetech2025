@@ -65,7 +65,11 @@ export async function PUT(request: NextRequest) {
       agent_task,
       agent_location,
       agent_info,
-      llm_model
+      llm_model,
+      vad_silence_threshold_secs,
+      vad_threshold,
+      min_speech_duration_ms,
+      min_silence_duration_ms
     } = body;
 
     if (!id) {
@@ -84,6 +88,10 @@ export async function PUT(request: NextRequest) {
     if (agent_location !== undefined) updateData.agent_location = agent_location;
     if (agent_info !== undefined) updateData.agent_info = agent_info;
     if (llm_model !== undefined) updateData.llm_model = llm_model;
+    if (vad_silence_threshold_secs !== undefined) updateData.vad_silence_threshold_secs = vad_silence_threshold_secs;
+    if (vad_threshold !== undefined) updateData.vad_threshold = vad_threshold;
+    if (min_speech_duration_ms !== undefined) updateData.min_speech_duration_ms = min_speech_duration_ms;
+    if (min_silence_duration_ms !== undefined) updateData.min_silence_duration_ms = min_silence_duration_ms;
 
     const { data, error } = await supabase
       .from('agents')
