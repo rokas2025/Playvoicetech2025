@@ -241,6 +241,8 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
     let llmTime: number | null = null;
     let ttsTime: number | null = null;
     let assistantText = '';
+    let agent: any = null;
+    let voiceSettings: any = null;
 
     try {
       setStatus('thinking');
@@ -262,7 +264,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       
       const agentRes = await fetch('/api/agents');
       const agentData = await agentRes.json();
-      const agent = agentData.agents?.[0];
+      agent = agentData.agents?.[0];
       
       const llmResponse = await fetch('/api/llm/chat', {
         method: 'POST',
@@ -301,8 +303,46 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
       };
       setMessages(prev => [...prev, assistantMessage]);
 
+      // Get voice settings for logging
+      if (agent) {
+        const settingsRes = await fetch(`/api/agents/voice-settings?agent_id=${agent.id}`);
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          if (settingsData.preset) {
+            voiceSettings = settingsData.preset;
+          }
+        }
+      }
+
       // Play TTS with streaming-v2
+      const ttsStart = performance.now();
       await playAssistantReplyStreamingV2(reply, agent);
+      ttsTime = (performance.now() - ttsStart) / 1000;
+
+      // Log timing for conversational mode
+      const totalTime = (performance.now() - startTime) / 1000;
+      
+      if (onTimingLog) {
+        onTimingLog({
+          id: Date.now().toString(),
+          timestamp: new Date(),
+          stt_time: null, // STT happens in real-time via WebSocket, not tracked separately
+          llm_time: llmTime,
+          tts_time: ttsTime,
+          total_time: totalTime,
+          input_text: text,
+          output_text: assistantText,
+          llm_model: agent?.llm_model,
+          tts_mode: 'streaming-v2',
+          interaction_mode: 'conversational', // Mark as conversational mode
+          stability: voiceSettings?.stability,
+          similarity_boost: voiceSettings?.similarity_boost,
+          style: voiceSettings?.style,
+          speed: voiceSettings?.speed,
+          use_speaker_boost: voiceSettings?.use_speaker_boost,
+          optimize_streaming_latency: voiceSettings?.optimize_streaming_latency,
+        });
+      }
 
     } catch (err) {
       console.error('[VoiceChat] Error in conversation loop:', err);
@@ -589,6 +629,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           output_text: assistantText,
           llm_model: agent?.llm_model,
           tts_mode: ttsResult?.ttsMode || 'normal',
+          interaction_mode: 'push-to-talk', // Mark as push-to-talk mode
           ...logVoiceSettings,
         });
       }
@@ -1000,6 +1041,7 @@ export function VoiceChat({ onTimingLog }: VoiceChatProps) {
           output_text: assistantText,
           llm_model: agent?.llm_model,
           tts_mode: ttsResult?.ttsMode || 'normal',
+          interaction_mode: 'push-to-talk', // Text input is also push-to-talk style
           ...logVoiceSettings,
         });
       }
